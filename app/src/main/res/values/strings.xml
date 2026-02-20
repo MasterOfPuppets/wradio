@@ -1,0 +1,73 @@
+<resources>
+    <string name="app_name">WRadio</string>
+
+    <!-- Navigation Titles -->
+    <string name="nav_explore">Explore</string>
+    <string name="nav_my_radio">My Radios</string>
+    <string name="nav_management">Manage</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Player Control -->
+    <string name="action_play">Play</string>
+    <string name="action_pause">Pause</string>
+    <string name="action_stop">Stop</string>
+    <string name="state_buffering">Buffering…</string>
+
+    <!-- Explore Screen -->
+    <string name="explore_search_hint">Search radio, tag or country…</string>
+    <string name="error_network">network error: %1$s</string>
+    <string name="error_no_results">No radio found with: %1$s</string>
+    <string name="lbl_bitrate">Bitrate</string>
+    <string name="lbl_codec">Codec</string>
+    <string name="lbl_votes">Votes</string>
+    <string name="lbl_homepage">Homepage</string>
+
+    <string name="action_preview">Preview</string>
+    <string name="action_import">Import</string>
+    <string name="status_saved">Saved</string>
+
+    <!-- Home Screen -->
+    <string name="home_empty_title">No stations found</string>
+    <string name="home_empty_message">Get new web radios in the \"Explore\" section\nor insert your own in the \"Manage\" section.</string>
+
+    <!-- Management -->
+    <string name="dialog_title_add">New Station</string>
+    <string name="dialog_title_edit">Edit Station</string>
+    <string name="dialog_label_name">Station Name</string>
+    <string name="dialog_label_url">Stream URL</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+
+    <string name="tag_manual">[Manual]</string>
+    <string name="action_delete">Delete</string>
+    <string name="desc_add_station">Add Station</string>
+
+    <string name="dialog_delete_title">Delete Station</string>
+    <string name="dialog_delete_message">Are you sure you want to delete this station?</string>
+    <string name="action_confirm_delete">Delete</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_group_about">About</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_terms">Terms and Conditions</string>
+    <string name="settings_group_data">Data &amp; Storage</string>
+    <string name="settings_clear_data">Factory Reset</string>
+    <string name="settings_clear_data_desc">Delete all stations and reset settings</string>
+
+    <!-- Clear Data Dialog -->
+    <string name="dialog_clear_title">Factory Reset</string>
+    <string name="dialog_clear_message">This action cannot be undone. All your stations and settings will be permanently deleted.</string>
+    <string name="action_delete_all">Reset App</string>
+
+    <!-- Error messages -->
+    <string name="error_invalid_url">Invalid URL)</string>
+    <string name="error_player_network">No internet connection.</string>
+    <string name="error_player_stream_offline">Station is offline or unavailable.</string>
+    <string name="error_player_unsupported">Audio format not supported.</string>
+    <string name="error_player_unknown">Playback error (%1$s).</string>
+
+    <!-- Feedback Messages -->
+    <string name="msg_station_deleted">Station deleted.</string>
+    <string name="msg_station_saved">Station saved.</string>
+    <string name="action_undo">Undo</string>
+</resources>
