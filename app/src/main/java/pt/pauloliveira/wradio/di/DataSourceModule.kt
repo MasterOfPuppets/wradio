@@ -12,10 +12,6 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 abstract class DataSourceModule {
 
-    /**
-     * Binds the RadioBrowserDataSource interface to its implementation.
-     * This tells Hilt: "When a class asks for RadioBrowserDataSource, give them RadioBrowserDataSourceImpl".
-     */
     @Binds
     @Singleton
     abstract fun bindRadioBrowserDataSource(

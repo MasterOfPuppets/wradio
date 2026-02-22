@@ -17,7 +17,6 @@ class ManagementViewModel @Inject constructor(
     private val repository: StationRepository
 ) : ViewModel() {
 
-    // Exposes the list of stations (Sorted in DB)
     val stations: StateFlow<List<Station>> = repository.getAllStations()
         .stateIn(
             scope = viewModelScope,

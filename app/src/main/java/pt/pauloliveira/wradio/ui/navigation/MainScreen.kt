@@ -31,18 +31,11 @@ import pt.pauloliveira.wradio.ui.home.HomeScreen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-    // Injected ViewModel to observe Player State
     viewModel: MainViewModel = hiltViewModel()
 ) {
     val navController = rememberNavController()
-
-    // Collect Player State
     val playerState by viewModel.playerState.collectAsState()
-
-    // State for managing Snackbars (notifications)
     val snackbarHostState = remember { SnackbarHostState() }
-
-    // Effect: Observe error messages from the Player State.
     LaunchedEffect(playerState.errorMsg) {
         playerState.errorMsg?.let { message ->
             snackbarHostState.showSnackbar(
@@ -75,8 +68,6 @@ fun MainScreen(
         },
         bottomBar = {
             Column(modifier = Modifier.fillMaxWidth()) {
-
-                // Only show MiniPlayer if a station is selected
                 if (playerState.station != null) {
                     MiniPlayer(
                         station = playerState.station!!,

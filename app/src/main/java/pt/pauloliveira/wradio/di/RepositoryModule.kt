@@ -12,7 +12,6 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
 
-    // @Binds tells Hilt which implementation to use when an interface is requested.
     @Binds
     @Singleton
     abstract fun bindStationRepository(

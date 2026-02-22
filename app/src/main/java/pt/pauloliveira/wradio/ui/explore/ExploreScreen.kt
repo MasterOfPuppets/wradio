@@ -132,7 +132,6 @@ fun ExploreScreen(
         }
     }
 
-    // Bottom Sheet for Station Details
     if (selectedWrapper != null) {
         StationDetailSheet(
             wrapper = selectedWrapper!!,
@@ -149,7 +148,7 @@ fun ExploreScreen(
             },
             onImportClick = {
                 viewModel.importStation(it)
-                selectedWrapper = selectedWrapper?.copy(status = StationStatus.Saved)
+                selectedWrapper = null
             }
         )
     }
@@ -231,7 +230,6 @@ fun RemoteStationItem(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Station Logo (List Size: 48dp)
         StationLogo(
             url = wrapper.station.stationLogo,
             uuid = wrapper.station.uuid,
@@ -263,7 +261,6 @@ fun RemoteStationItem(
             }
         }
 
-        // Visual indicator if saved
         if (wrapper.status == StationStatus.Saved) {
             Icon(
                 imageVector = Icons.Default.Check,
@@ -287,8 +284,6 @@ fun StationDetailSheet(
 ) {
     val station = wrapper.station
     val context = LocalContext.current
-
-    // Determine Player UI State for THIS station
     val isCurrentStation = playerState.station?.uuid == station.uuid
     val isPlaying = isCurrentStation && playerState.isPlaying
     val isBuffering = isCurrentStation && playerState.isBuffering
@@ -306,7 +301,6 @@ fun StationDetailSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(bottom = 16.dp)
             ) {
-                // Station Logo (Detail Size: 64dp)
                 StationLogo(
                     url = station.stationLogo,
                     uuid = station.uuid,
@@ -361,7 +355,6 @@ fun StationDetailSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Homepage Link
             if (!station.homepage.isNullOrBlank()) {
                 Row(
                     modifier = Modifier
@@ -394,16 +387,14 @@ fun StationDetailSheet(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Actions
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Preview Button (Reactive)
                 FilledTonalButton(
                     onClick = { onPreviewClick(station) },
                     modifier = Modifier.weight(1f),
-                    enabled = !isBuffering // Disable while buffering to avoid spam
+                    enabled = !isBuffering
                 ) {
                     if (isBuffering) {
                         CircularProgressIndicator(
@@ -424,7 +415,6 @@ fun StationDetailSheet(
                     }
                 }
 
-                // Import Button
                 Button(
                     onClick = { onImportClick(station) },
                     modifier = Modifier.weight(1f),

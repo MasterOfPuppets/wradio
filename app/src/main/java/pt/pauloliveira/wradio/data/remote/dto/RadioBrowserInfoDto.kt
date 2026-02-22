@@ -3,10 +3,6 @@ package pt.pauloliveira.wradio.data.remote.dto
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
-/**
- * Represents a RadioBrowserInfo object returned by the Radio Browser API.
- * We only map the fields necessary for the application to reduce memory footprint.
- */
 @JsonClass(generateAdapter = true)
 data class RadioBrowserInfoDto(
     @Json(name = "stationuuid")

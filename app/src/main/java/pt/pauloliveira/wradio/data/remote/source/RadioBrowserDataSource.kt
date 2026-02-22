@@ -2,10 +2,6 @@ package pt.pauloliveira.wradio.data.remote.source
 
 import pt.pauloliveira.wradio.data.remote.dto.RadioBrowserInfoDto
 
-/**
- * Contract for the remote data source that handles interactions with the Radio Browser API.
- * This abstraction layer decouples the Repository from the specific network implementation (Retrofit).
- */
 interface RadioBrowserDataSource {
 
     /**

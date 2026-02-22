@@ -40,7 +40,6 @@
 
     <string name="tag_manual">[Manual]</string>
     <string name="action_delete">Delete</string>
-    <string name="desc_add_station">Add Station</string>
 
     <string name="dialog_delete_title">Delete Station</string>
     <string name="dialog_delete_message">Are you sure you want to delete this station?</string>
@@ -53,6 +52,18 @@
     <string name="settings_group_data">Data &amp; Storage</string>
     <string name="settings_clear_data">Factory Reset</string>
     <string name="settings_clear_data_desc">Delete all stations and reset settings</string>
+    <string name="settings_group_playback">Playback</string>
+    <string name="settings_buffer_size">Buffer Size</string>
+    <string name="settings_buffer_desc">Higher values help on unstable networks. Requires restart.</string>
+
+    <string name="dialog_buffer_title">Set Buffer Length</string>
+    <string name="label_seconds">%d seconds</string>
+
+    <!-- New buffer settings dialog -->
+    <string name="dialog_restart_title">Restart Required</string>
+    <string name="dialog_restart_message">To apply the new buffer settings, the app needs to restart. The audio will stop.\n\nRestart now?</string>
+    <string name="action_restart_app">Restart App</string>
+    <string name="action_later">Later</string>
 
     <!-- Clear Data Dialog -->
     <string name="dialog_clear_title">Factory Reset</string>
@@ -69,5 +80,4 @@
     <!-- Feedback Messages -->
     <string name="msg_station_deleted">Station deleted.</string>
     <string name="msg_station_saved">Station saved.</string>
-    <string name="action_undo">Undo</string>
 </resources>

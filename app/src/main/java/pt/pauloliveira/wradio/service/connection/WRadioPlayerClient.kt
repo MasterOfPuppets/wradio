@@ -28,6 +28,7 @@ class WRadioPlayerClient @Inject constructor(
 
     companion object {
         const val EXTRA_STATION_UUID = "pt.pauloliveira.wradio.STATION_UUID"
+        private const val TAG = "WRadioPlayerClient"
     }
 
     private val _playerState = MutableStateFlow(PlayerState())
@@ -35,6 +36,8 @@ class WRadioPlayerClient @Inject constructor(
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var controller: MediaController? = null
+
+    private var currentPlaylist: List<Station> = emptyList()
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -57,23 +60,42 @@ class WRadioPlayerClient @Inject constructor(
             }
         }
 
-        /**
-         * Método Standard: Tenta capturar metadados atualizados pelo sistema.
-         */
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            super.onMediaItemTransition(mediaItem, reason)
+
+            if (mediaItem != null) {
+                val uuid = mediaItem.mediaMetadata.extras?.getString(EXTRA_STATION_UUID)
+                val newStation = currentPlaylist.find { it.uuid == uuid }
+
+                if (newStation != null) {
+                    _playerState.update {
+                        it.copy(
+                            station = newStation,
+                            metadata = null,
+                            errorMsg = null
+                        )
+                    }
+                }
+            }
+        }
+
         override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
             super.onMediaMetadataChanged(mediaMetadata)
 
             val title = mediaMetadata.title?.toString()
             val artist = mediaMetadata.artist?.toString()
             val displayTitle = mediaMetadata.displayTitle?.toString()
-            val textToShow = title ?: artist ?: displayTitle
-
-            if (!textToShow.isNullOrBlank()) {
-                _playerState.update { it.copy(metadata = textToShow) }
+            val currentStationName = _playerState.value.station?.name
+            val validTitle = if (title != null && title != currentStationName) title else null
+            val textToShow = when {
+                !validTitle.isNullOrBlank() -> validTitle
+                !artist.isNullOrBlank() -> artist
+                !displayTitle.isNullOrBlank() -> displayTitle
+                else -> null
             }
+
+            _playerState.update { it.copy(metadata = textToShow) }
         }
-
-
     }
 
     private fun getUserFriendlyErrorMessage(error: PlaybackException): String {
@@ -91,10 +113,7 @@ class WRadioPlayerClient @Inject constructor(
             PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED ->
                 context.getString(pt.pauloliveira.wradio.R.string.error_player_unsupported)
 
-            else -> context.getString(
-                pt.pauloliveira.wradio.R.string.error_player_unknown,
-                error.errorCodeName
-            )
+            else -> context.getString(pt.pauloliveira.wradio.R.string.error_player_unknown, error.errorCodeName)
         }
     }
 
@@ -129,36 +148,31 @@ class WRadioPlayerClient @Inject constructor(
         return ctrl
     }
 
-    suspend fun play(station: Station) {
+    suspend fun play(stations: List<Station>, startIndex: Int = 0) {
         val ctrl = getController()
 
-        _playerState.update {
-            it.copy(station = station, isBuffering = true, errorMsg = null, metadata = null)
+        currentPlaylist = stations
+        if (stations.isNotEmpty()) {
+            _playerState.update {
+                it.copy(
+                    station = stations[startIndex],
+                    isBuffering = true,
+                    errorMsg = null,
+                    metadata = null
+                )
+            }
+        }
+        val mediaItems = stations.map { station ->
+            createMediaItem(station)
         }
 
-        var cleanUrl = station.streamUrl
-        if (cleanUrl.startsWith("icy://") || cleanUrl.startsWith("icyx://")) {
-            cleanUrl = cleanUrl.replace("icy://", "http://")
-                .replace("icyx://", "http://")
-        }
-
-        val extras = Bundle().apply {
-            putString(EXTRA_STATION_UUID, station.uuid)
-        }
-
-        val mediaItem = MediaItem.Builder()
-            .setUri(cleanUrl)
-            .setMediaMetadata(
-                MediaMetadata.Builder()
-                    .setTitle(station.name)
-                    .setExtras(extras)
-                    .build()
-            )
-            .build()
-
-        ctrl.setMediaItem(mediaItem)
+        ctrl.setMediaItems(mediaItems, startIndex, 0L)
         ctrl.prepare()
         ctrl.play()
+    }
+
+    suspend fun play(station: Station) {
+        play(listOf(station), 0)
     }
 
     suspend fun resume() {
@@ -172,5 +186,36 @@ class WRadioPlayerClient @Inject constructor(
     suspend fun stop() {
         getController().stop()
         _playerState.update { it.copy(isPlaying = false, isBuffering = false) }
+    }
+
+    private fun createMediaItem(station: Station): MediaItem {
+        var cleanUrl = station.streamUrl
+        if (cleanUrl.startsWith("icy://") || cleanUrl.startsWith("icyx://")) {
+            cleanUrl = cleanUrl.replace("icy://", "http://")
+                .replace("icyx://", "http://")
+        }
+
+        val extras = Bundle().apply {
+            putString(EXTRA_STATION_UUID, station.uuid)
+        }
+
+        return MediaItem.Builder()
+            .setUri(cleanUrl)
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(station.name)
+                    .setExtras(extras)
+                    .build()
+            )
+            .build()
+    }
+
+    suspend fun updatePlaylistContext(stations: List<Station>, currentStationUuid: String) {
+        val newIndex = stations.indexOfFirst { it.uuid == currentStationUuid }
+        if (newIndex == -1) return
+        val ctrl = getController()
+        currentPlaylist = stations
+        val mediaItems = stations.map { createMediaItem(it) }
+        ctrl.setMediaItems(mediaItems, newIndex, ctrl.currentPosition)
     }
 }

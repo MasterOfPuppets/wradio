@@ -4,10 +4,6 @@ import pt.pauloliveira.wradio.data.remote.RadioBrowserApi
 import pt.pauloliveira.wradio.data.remote.dto.RadioBrowserInfoDto
 import javax.inject.Inject
 
-/**
- * Concrete implementation of [RadioBrowserDataSource].
- * Delegates the actual network calls to the Retrofit interface [RadioBrowserApi].
- */
 class RadioBrowserDataSourceImpl @Inject constructor(
     private val api: RadioBrowserApi
 ) : RadioBrowserDataSource {

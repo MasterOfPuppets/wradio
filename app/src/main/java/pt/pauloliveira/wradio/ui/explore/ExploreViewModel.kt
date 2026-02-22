@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import pt.pauloliveira.wradio.domain.model.Station
@@ -20,36 +21,26 @@ class ExploreViewModel @Inject constructor(
     private val playerClient: WRadioPlayerClient
 ) : ViewModel() {
 
-    // 1. Tracks the raw list from the API
     private val _remoteStations = MutableStateFlow<List<Station>>(emptyList())
-
-    // 2. Tracks the loading/error state
     private val _searchState = MutableStateFlow<ExploreUiState>(ExploreUiState.Idle)
-
-    // 3. Combines API results + Local DB + Search State into the final UI State
     val uiState: StateFlow<ExploreUiState> = combine(
         _searchState,
         _remoteStations,
-        repository.getAllStations() // Real-time observation of Local DB
+        repository.getAllStations()
     ) { searchState, remoteList, localList ->
 
-        // If we are Loading or have an Error, return that state directly
         if (searchState is ExploreUiState.Loading || searchState is ExploreUiState.Error) {
             return@combine searchState
         }
 
-        // Otherwise, calculate the status for each remote station
         if (remoteList.isEmpty()) {
-            // Keep the Idle or NoResults state if the list is empty
             searchState
         } else {
             val wrappers = remoteList.map { remote ->
-                // Find if we have this station in DB (by UUID)
                 val localMatch = localList.find { it.uuid == remote.uuid }
 
                 val status = when {
                     localMatch == null -> StationStatus.NotSaved
-                    // Logic: Conflict if URL OR Name is different.
                     localMatch.streamUrl != remote.streamUrl || localMatch.name != remote.name -> StationStatus.Conflict
                     else -> StationStatus.Saved
                 }
@@ -71,7 +62,6 @@ class ExploreViewModel @Inject constructor(
             _searchState.value = ExploreUiState.Loading
 
             try {
-                // Fetch from API (IO Thread handled in Repository)
                 val results = repository.searchRemoteStations(query)
 
                 if (results.isEmpty()) {
@@ -97,6 +87,11 @@ class ExploreViewModel @Inject constructor(
     fun importStation(station: Station) {
         viewModelScope.launch {
             repository.saveStation(station)
+            val currentPlaying = playerClient.playerState.value.station
+            if (currentPlaying?.uuid == station.uuid) {
+                val allStations = repository.getAllStations().first()
+                playerClient.updatePlaylistContext(allStations, station.uuid)
+            }
         }
     }
 }

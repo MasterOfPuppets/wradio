@@ -4,10 +4,6 @@ import pt.pauloliveira.wradio.data.remote.dto.RadioBrowserInfoDto
 import retrofit2.http.GET
 import retrofit2.http.Query
 
-/**
- * Interface defining the endpoints for the Radio Browser API.
- * Documentation: https://api.radio-browser.info/
- */
 interface RadioBrowserApi {
 
     /**

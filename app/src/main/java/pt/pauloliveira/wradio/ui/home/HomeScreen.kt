@@ -39,7 +39,6 @@ import pt.pauloliveira.wradio.ui.common.StationLogo
 fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
-    // Collect the list of stations from the ViewModel (Single Source of Truth)
     val stations by viewModel.stations.collectAsState()
 
     if (stations.isEmpty()) {
@@ -117,7 +116,6 @@ fun StationItem(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Updated Component
             StationLogo(
                 url = station.stationLogo,
                 uuid = station.uuid,
@@ -127,14 +125,11 @@ fun StationItem(
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            // Station Info
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = station.name,
                     style = MaterialTheme.typography.titleMedium
                 )
-
-                // Optional: Show tags or country if available
                 if (station.tags.isNotEmpty()) {
                     Text(
                         text = station.tags.joinToString(", "),
@@ -143,8 +138,6 @@ fun StationItem(
                     )
                 }
             }
-
-            // Play Icon indicator
             Icon(
                 imageVector = Icons.Default.PlayArrow,
                 contentDescription = null,

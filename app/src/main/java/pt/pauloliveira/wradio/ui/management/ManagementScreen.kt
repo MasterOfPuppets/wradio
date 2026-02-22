@@ -52,50 +52,31 @@ import pt.pauloliveira.wradio.ui.common.StationLogo
 fun ManagementScreen(
     viewModel: ManagementViewModel = hiltViewModel()
 ) {
-    // Collects the station list flow from ViewModel
     val stations by viewModel.stations.collectAsState()
-
-    // State for UI Feedback (Snackbars)
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-
-    // Strings for feedback
     val msgSaved = stringResource(R.string.msg_station_saved)
     val msgDeleted = stringResource(R.string.msg_station_deleted)
-
-    // State to control the visibility of the Add/Edit Dialog
     var showDialog by remember { mutableStateOf(false) }
-
-    // State to track which station is being edited (null means creating a new one)
     var stationToEdit by remember { mutableStateOf<Station?>(null) }
-
-    // State to track which station is being deleted (null means no deletion in progress)
-    var stationToDelete by remember { mutableStateOf<Station?>(null) }
-
-    // Logic to show the Add/Edit dialog
-    if (showDialog) {
+   var stationToDelete by remember { mutableStateOf<Station?>(null) }
+   if (showDialog) {
         AddEditStationDialog(
             stationToEdit = stationToEdit,
             onDismiss = { showDialog = false },
             onSave = { name, url ->
                 if (stationToEdit == null) {
-                    // Create logic
                     viewModel.addManualStation(name, url)
                 } else {
-                    // Update logic
                     viewModel.updateStation(stationToEdit!!, name, url)
                 }
                 showDialog = false
-
-                // Show feedback
                 scope.launch {
                     snackbarHostState.showSnackbar(msgSaved)
                 }
             }
         )
     }
-
-    // Logic to show the Delete Confirmation Dialog
     if (stationToDelete != null) {
         AlertDialog(
             onDismissRequest = { stationToDelete = null },
@@ -141,7 +122,7 @@ fun ManagementScreen(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(onClick = {
-                stationToEdit = null // Reset to "New" mode
+                stationToEdit = null
                 showDialog = true
             }) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.dialog_title_add))
@@ -152,7 +133,7 @@ fun ManagementScreen(
             stations = stations,
             padding = paddingValues,
             onEditClick = { station ->
-                stationToEdit = station // Set "Edit" mode
+                stationToEdit = station
                 showDialog = true
             },
             onDeleteClick = { station ->
@@ -173,7 +154,6 @@ fun ManagementList(
         modifier = Modifier
             .fillMaxSize()
             .padding(padding),
-        // Padding bottom extra para o botão flutuante não tapar o último item
         contentPadding = PaddingValues(top = 16.dp, start = 16.dp, end = 16.dp, bottom = 88.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -201,7 +181,6 @@ fun ManagementItem(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Updated Component: Station Logo (40dp)
             StationLogo(
                 url = station.stationLogo,
                 uuid = station.uuid,
@@ -211,7 +190,6 @@ fun ManagementItem(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Station Info
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = station.name,
@@ -235,7 +213,6 @@ fun ManagementItem(
                 }
             }
 
-            // Actions
             Row {
                 IconButton(onClick = { onEditClick(station) }) {
                     Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.dialog_title_edit))

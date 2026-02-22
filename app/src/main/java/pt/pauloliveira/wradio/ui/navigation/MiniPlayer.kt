@@ -55,7 +55,6 @@ fun MiniPlayer(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Updated Component: Station Logo (48dp)
             StationLogo(
                 url = station.stationLogo,
                 uuid = station.uuid,
@@ -64,8 +63,6 @@ fun MiniPlayer(
             )
 
             Spacer(modifier = Modifier.width(16.dp))
-
-            // Station Info
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.Center
@@ -77,8 +74,6 @@ fun MiniPlayer(
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-
-                // Status Line: Buffering OR Metadata OR Empty
                 if (isBuffering) {
                     Text(
                         text = stringResource(R.string.state_buffering),
@@ -95,8 +90,6 @@ fun MiniPlayer(
                     )
                 }
             }
-
-            // Controls
             if (isBuffering) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(32.dp),

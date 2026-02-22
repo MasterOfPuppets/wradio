@@ -19,7 +19,7 @@ data class StationEntity(
     fun toDomain(): Station {
         return Station(
             uuid = uuid,
-            name = name,
+            name = this.name.trim().take(80),
             streamUrl = streamUrl,
             stationLogo = stationLogo,
             countryCode = countryCode,

@@ -43,19 +43,24 @@ android {
 }
 
 dependencies {
-
+    // --- Android Core & Lifecycle ---
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.concurrent.futures.ktx)
+    implementation(libs.androidx.datastore.preferences)
 
+    // --- Jetpack Compose (UI) ---
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.material.icons.extended)
+    implementation(libs.androidx.navigation.compose)
 
+    // --- Architecture (Hilt & Room) ---
     implementation(libs.hilt.android)
     implementation(libs.hilt.navigation.compose)
     ksp(libs.hilt.compiler)
@@ -64,19 +69,19 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
+    // --- Network (Retrofit & OkHttp) ---
     implementation(libs.retrofit)
     implementation(libs.converter.moshi)
     implementation(libs.moshi.kotlin)
     implementation(libs.okhttp.logging)
 
+    // --- Media & Images ---
     implementation(libs.coil.compose)
-    implementation(libs.androidx.material.icons.extended)
-
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.session)
-    implementation(libs.androidx.concurrent.futures.ktx)
     implementation(libs.androidx.media3.datasource.okhttp)
 
+    // --- Testing ---
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

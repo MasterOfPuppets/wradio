@@ -25,13 +25,15 @@ class HomeViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
-        fun play(station: Station) {
+    fun play(station: Station) {
         viewModelScope.launch {
-            val updatedStation = station.copy(
-                lastPlayed = System.currentTimeMillis()
-            )
+            val updatedStation = station.copy(lastPlayed = System.currentTimeMillis())
             repository.saveStation(updatedStation)
-            playerClient.play(updatedStation)
+
+            val currentList = stations.value
+            val startIndex = currentList.indexOfFirst { it.uuid == station.uuid }.takeIf { it != -1 } ?: 0
+
+            playerClient.play(currentList, startIndex)
         }
     }
 }
