@@ -24,8 +24,34 @@ class SettingsViewModel @Inject constructor(
             initialValue = 30
         )
 
+    val duckLevel: StateFlow<Float> = preferencesRepository.getDuckLevel()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0.1f
+        )
+
+    val bluetoothAutoPause: StateFlow<Boolean> = preferencesRepository.getBluetoothAutoPause()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
+
     suspend fun saveBufferSize(seconds: Int) {
         preferencesRepository.setBufferSeconds(seconds)
+    }
+
+    fun saveDuckLevel(level: Float) {
+        viewModelScope.launch {
+            preferencesRepository.setDuckLevel(level)
+        }
+    }
+
+    fun saveBluetoothAutoPause(enabled: Boolean) {
+        viewModelScope.launch {
+            preferencesRepository.setBluetoothAutoPause(enabled)
+        }
     }
 
     fun clearAllData() {

@@ -8,5 +8,13 @@ interface PreferencesRepository {
 
     suspend fun setBufferSeconds(seconds: Int)
 
+    fun getDuckLevel(): Flow<Float>
+
+    suspend fun setDuckLevel(level: Float)
+
+    fun getBluetoothAutoPause(): Flow<Boolean>
+
+    suspend fun setBluetoothAutoPause(enabled: Boolean)
+
     suspend fun resetToDefaults()
 }

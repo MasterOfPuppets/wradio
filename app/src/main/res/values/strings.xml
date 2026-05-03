@@ -55,8 +55,14 @@
     <string name="settings_group_playback">Playback</string>
     <string name="settings_buffer_size">Buffer Size</string>
     <string name="settings_buffer_desc">Higher values help on unstable networks. Requires restart.</string>
+    <string name="settings_duck_level">Volume During Ducking</string>
+    <string name="settings_duck_level_value">%d%%</string>
+    <string name="settings_duck_desc">Volume level when another app (e.g. navigation) needs audio.</string>
+    <string name="settings_bt_pause">Pause on Bluetooth Disconnect</string>
+    <string name="settings_bt_pause_desc">Stop playback when a Bluetooth device disconnects.</string>
 
     <string name="dialog_buffer_title">Set Buffer Length</string>
+    <string name="dialog_duck_title">Set Duck Volume</string>
     <string name="label_seconds">%d seconds</string>
 
     <!-- New buffer settings dialog -->

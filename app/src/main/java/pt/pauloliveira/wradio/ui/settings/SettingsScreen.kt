@@ -14,10 +14,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.VolumeDown
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -25,7 +27,9 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,6 +39,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,9 +61,12 @@ fun SettingsScreen(
     val context = LocalContext.current
     val appVersion = BuildConfig.VERSION_NAME
     val bufferSize by viewModel.bufferSize.collectAsState()
+    val duckLevel by viewModel.duckLevel.collectAsState()
+    val bluetoothAutoPause by viewModel.bluetoothAutoPause.collectAsState()
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showBufferDialog by remember { mutableStateOf(false) }
+    var showDuckDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -78,6 +86,25 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+            SettingsItem(
+                icon = Icons.Default.VolumeDown,
+                title = stringResource(R.string.settings_duck_level),
+                subtitle = stringResource(R.string.settings_duck_level_value, (duckLevel * 100).toInt()),
+                onClick = { showDuckDialog = true }
+            )
+            Text(
+                text = stringResource(R.string.settings_duck_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+            SettingsToggleItem(
+                icon = Icons.Default.Bluetooth,
+                title = stringResource(R.string.settings_bt_pause),
+                subtitle = stringResource(R.string.settings_bt_pause_desc),
+                checked = bluetoothAutoPause,
+                onCheckedChange = { viewModel.saveBluetoothAutoPause(it) }
             )
         }
 
@@ -128,6 +155,17 @@ fun SettingsScreen(
         )
     }
 
+    if (showDuckDialog) {
+        DuckLevelDialog(
+            currentValue = duckLevel,
+            onDismiss = { showDuckDialog = false },
+            onSelected = { level ->
+                viewModel.saveDuckLevel(level)
+                showDuckDialog = false
+            }
+        )
+    }
+
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -152,6 +190,92 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+fun DuckLevelDialog(
+    currentValue: Float,
+    onDismiss: () -> Unit,
+    onSelected: (Float) -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    var sliderValue by rememberSaveable { mutableStateOf(currentValue) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.dialog_duck_title)) },
+        text = {
+            Column {
+                Text(
+                    text = stringResource(R.string.settings_duck_level_value, (sliderValue * 100).toInt()),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Slider(
+                    value = sliderValue,
+                    onValueChange = { sliderValue = it },
+                    valueRange = 0f..1f,
+                    steps = 19
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSelected(sliderValue) }) {
+                Text(stringResource(R.string.action_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        }
+    )
+}
+
+@Composable
+fun SettingsToggleItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String? = null,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Surface(
+        color = androidx.compose.ui.graphics.Color.Transparent
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange
+            )
+        }
     }
 }
 

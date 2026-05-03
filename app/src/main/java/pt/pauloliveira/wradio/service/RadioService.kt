@@ -1,5 +1,14 @@
 package pt.pauloliveira.wradio.service
 
+import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.os.Build
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Metadata
@@ -13,7 +22,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import pt.pauloliveira.wradio.domain.repository.PreferencesRepository
 import pt.pauloliveira.wradio.domain.repository.StationRepository
 import pt.pauloliveira.wradio.service.connection.WRadioPlayerClient
 import javax.inject.Inject
@@ -26,11 +38,60 @@ class RadioService : MediaSessionService() {
     lateinit var player: Player
     @Inject
     lateinit var repository: StationRepository
+    @Inject
+    lateinit var preferencesRepository: PreferencesRepository
+
     private var mediaSession: MediaSession? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var sessionStartTime: Long = 0
     private var currentPlayingUuid: String? = null
     private val MIN_LISTEN_THRESHOLD = 60000L
+
+    private lateinit var audioManager: AudioManager
+    private var audioFocusRequest: AudioFocusRequest? = null
+    private var wasPlayingBeforeFocusLoss = false
+
+    // Bluetooth receiver
+    private val bluetoothReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == BluetoothDevice.ACTION_ACL_DISCONNECTED) {
+                val shouldAutoPause = runBlocking {
+                    preferencesRepository.getBluetoothAutoPause().first()
+                }
+                if (shouldAutoPause && player.isPlaying) {
+                    player.stop()
+                }
+            }
+        }
+    }
+
+    // Audio focus listener
+    private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+        when (focusChange) {
+            AudioManager.AUDIOFOCUS_LOSS -> {
+                // Permanent loss (e.g. phone call started) — stop and re-play when regained
+                wasPlayingBeforeFocusLoss = player.isPlaying
+                if (player.isPlaying) player.stop()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                wasPlayingBeforeFocusLoss = player.isPlaying
+                if (player.isPlaying) player.stop()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                val duckLevel = runBlocking {
+                    preferencesRepository.getDuckLevel().first()
+                }
+                player.volume = duckLevel
+            }
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                player.volume = 1.0f
+                if (wasPlayingBeforeFocusLoss) {
+                    player.play()
+                    wasPlayingBeforeFocusLoss = false
+                }
+            }
+        }
+    }
     private val playerListener = object : Player.Listener {
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -78,8 +139,11 @@ class RadioService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         mediaSession = MediaSession.Builder(this, player).build()
         player.addListener(playerListener)
+        requestAudioFocus()
+        registerBluetoothReceiver()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
@@ -87,6 +151,8 @@ class RadioService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        abandonAudioFocus()
+        unregisterReceiver(bluetoothReceiver)
         mediaSession?.run {
             player.removeListener(playerListener)
             player.release()
@@ -95,6 +161,34 @@ class RadioService : MediaSessionService() {
         }
         serviceScope.cancel()
         super.onDestroy()
+    }
+
+    private fun requestAudioFocus() {
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+            .build()
+        audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+            .setAudioAttributes(audioAttributes)
+            .setAcceptsDelayedFocusGain(true)
+            .setWillPauseWhenDucked(false)
+            .setOnAudioFocusChangeListener(audioFocusListener)
+            .build()
+        audioManager.requestAudioFocus(audioFocusRequest!!)
+    }
+
+    private fun abandonAudioFocus() {
+        audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+    }
+
+    private fun registerBluetoothReceiver() {
+        val filter = IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(bluetoothReceiver, filter, Context.RECEIVER_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(bluetoothReceiver, filter)
+        }
     }
 
     private fun startSession(mediaItem: MediaItem?) {
