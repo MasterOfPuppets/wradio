@@ -27,8 +27,13 @@
     <string name="status_saved">Saved</string>
 
     <!-- Home Screen -->
+    <string name="home_title">My Radio</string>
     <string name="home_empty_title">No stations found</string>
     <string name="home_empty_message">Get new web radios in the \"Explore\" section\nor insert your own in the \"Manage\" section.</string>
+    <string name="cd_sort_field_name">Sort by name</string>
+    <string name="cd_sort_field_total_play_time">Sort by total play time</string>
+    <string name="cd_sort_direction_asc">Ascending order</string>
+    <string name="cd_sort_direction_desc">Descending order</string>
 
     <!-- Management -->
     <string name="dialog_title_add">New Station</string>

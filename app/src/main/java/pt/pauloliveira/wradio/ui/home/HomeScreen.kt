@@ -2,6 +2,7 @@ package pt.pauloliveira.wradio.ui.home
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -16,10 +17,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,52 +46,116 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val stations by viewModel.stations.collectAsState()
+    val sortField by viewModel.sortField.collectAsState()
+    val sortDirection by viewModel.sortDirection.collectAsState()
 
-    if (stations.isEmpty()) {
-        HomeEmptyState()
-    } else {
-        StationList(
-            stations = stations,
-            onStationClick = { station ->
-                viewModel.play(station)
-            }
+    Column(modifier = Modifier.fillMaxSize()) {
+        HomeHeader(
+            sortField = sortField,
+            sortDirection = sortDirection,
+            onSortFieldClick = { viewModel.toggleSortField() },
+            onSortDirectionClick = { viewModel.toggleSortDirection() }
         )
+
+        if (stations.isEmpty()) {
+            HomeEmptyState(modifier = Modifier.weight(1f))
+        } else {
+            StationList(
+                modifier = Modifier.weight(1f),
+                stations = stations,
+                onStationClick = { station ->
+                    viewModel.play(station)
+                }
+            )
+        }
     }
 }
 
 @Composable
-fun HomeEmptyState() {
-    Column(
+fun HomeHeader(
+    sortField: HomeViewModel.SortField,
+    sortDirection: HomeViewModel.SortDirection,
+    onSortFieldClick: () -> Unit,
+    onSortDirectionClick: () -> Unit
+) {
+    Row(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = stringResource(R.string.home_empty_title),
+            text = stringResource(R.string.home_title),
             style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.primary
+            modifier = Modifier.weight(1f)
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        IconButton(onClick = onSortFieldClick) {
+            val fieldIcon = if (sortField == HomeViewModel.SortField.Name) {
+                Icons.Default.SortByAlpha
+            } else {
+                Icons.Default.Schedule
+            }
+            val fieldDescription = if (sortField == HomeViewModel.SortField.Name) {
+                stringResource(R.string.cd_sort_field_name)
+            } else {
+                stringResource(R.string.cd_sort_field_total_play_time)
+            }
+            Icon(imageVector = fieldIcon, contentDescription = fieldDescription)
+        }
 
-        Text(
-            text = stringResource(R.string.home_empty_message),
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        IconButton(onClick = onSortDirectionClick) {
+            val directionIcon = if (sortDirection == HomeViewModel.SortDirection.Asc) {
+                Icons.Default.ArrowUpward
+            } else {
+                Icons.Default.ArrowDownward
+            }
+            val directionDescription = if (sortDirection == HomeViewModel.SortDirection.Asc) {
+                stringResource(R.string.cd_sort_direction_asc)
+            } else {
+                stringResource(R.string.cd_sort_direction_desc)
+            }
+            Icon(imageVector = directionIcon, contentDescription = directionDescription)
+        }
+    }
+}
+
+@Composable
+fun HomeEmptyState(modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = stringResource(R.string.home_empty_title),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = stringResource(R.string.home_empty_message),
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
 @Composable
 fun StationList(
+    modifier: Modifier = Modifier,
     stations: List<Station>,
     onStationClick: (Station) -> Unit
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {

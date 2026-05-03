@@ -59,12 +59,14 @@ fun MainScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
-            val currentScreen = items.find { it.route == currentDestination?.route }
-                ?: Screen.MyRadio
+            if (currentDestination?.route != Screen.MyRadio.route) {
+                val currentScreen = items.find { it.route == currentDestination?.route }
+                    ?: Screen.MyRadio
 
-            CenterAlignedTopAppBar(
-                title = { Text(stringResource(currentScreen.title)) }
-            )
+                CenterAlignedTopAppBar(
+                    title = { Text(stringResource(currentScreen.title)) }
+                )
+            }
         },
         bottomBar = {
             Column(modifier = Modifier.fillMaxWidth()) {
