@@ -1,21 +1,17 @@
 package pt.pauloliveira.wradio.data.repository
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withContext
 import pt.pauloliveira.wradio.data.local.dao.StationDao
 import pt.pauloliveira.wradio.data.local.entity.toEntity
-import pt.pauloliveira.wradio.data.remote.dto.RadioBrowserInfoDto
-import pt.pauloliveira.wradio.data.remote.source.RadioBrowserDataSource
+import pt.pauloliveira.wradio.data.remote.source.UnifiedSearchDataSource
 import pt.pauloliveira.wradio.domain.model.Station
 import pt.pauloliveira.wradio.domain.repository.StationRepository
 import javax.inject.Inject
 
 class StationRepositoryImpl @Inject constructor(
     private val dao: StationDao,
-    private val remoteDataSource: RadioBrowserDataSource
+    private val unifiedSearchDataSource: UnifiedSearchDataSource
 ) : StationRepository {
 
     override fun getStationsByHistory(): Flow<List<Station>> {
@@ -52,38 +48,8 @@ class StationRepositoryImpl @Inject constructor(
         dao.deleteAllStations()
     }
 
-    override suspend fun searchRemoteStations(query: String): List<Station> =
-        withContext(Dispatchers.IO) {
-            if (query.isBlank()) return@withContext emptyList()
-            val nameJob = async {
-                remoteDataSource.search(name = query, limit = 50)
-            }
-            val tagJob = async {
-                remoteDataSource.search(tag = query, limit = 50)
-            }
-            val nameResults = nameJob.await()
-            val tagResults = tagJob.await()
-            (nameResults + tagResults)
-                .distinctBy { it.uuid }
-                .map { it.toDomain() }
-        }
-
-    private fun RadioBrowserInfoDto.toDomain(): Station {
-        return Station(
-            uuid = this.uuid,
-            name = this.name.trim().take(80),
-            streamUrl = this.url,
-            stationLogo = this.favicon,
-            countryCode = this.countryCode,
-            tags = this.tags?.split(",")?.map { it.trim() }?.take(5) ?: emptyList(),
-            lastPlayed = null,
-            totalPlayTime = 0,
-            isManuallyAdded = false,
-            homepage = this.homepage,
-            codec = this.codec,
-            bitrate = this.bitrate,
-            clickCount = this.clickCount,
-            votes = this.votes
-        )
+    override suspend fun searchRemoteStations(query: String): List<Station> {
+        if (query.isBlank()) return emptyList()
+        return unifiedSearchDataSource.search(query).map { it.station }
     }
 }

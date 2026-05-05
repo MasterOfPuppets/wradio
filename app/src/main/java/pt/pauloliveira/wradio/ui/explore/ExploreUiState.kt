@@ -20,7 +20,8 @@ sealed interface ExploreUiState {
 
 data class ExploreStationWrapper(
     val station: Station,
-    val status: StationStatus
+    val status: StationStatus,
+    val sourceLabel: String = ""
 )
 
 enum class StationStatus {

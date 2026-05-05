@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.VolumeDown
 import androidx.compose.material3.AlertDialog
@@ -63,6 +64,7 @@ fun SettingsScreen(
     val bufferSize by viewModel.bufferSize.collectAsState()
     val duckLevel by viewModel.duckLevel.collectAsState()
     val bluetoothAutoPause by viewModel.bluetoothAutoPause.collectAsState()
+    val sourcesRefreshState by viewModel.sourcesRefreshState.collectAsState()
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showBufferDialog by remember { mutableStateOf(false) }
@@ -128,6 +130,22 @@ fun SettingsScreen(
                         // Ignore
                     }
                 }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        SettingsGroup(title = stringResource(R.string.settings_group_sources)) {
+            SettingsItem(
+                icon = Icons.Default.Refresh,
+                title = stringResource(R.string.settings_update_sources),
+                subtitle = when (sourcesRefreshState) {
+                    is SourcesRefreshState.Loading -> stringResource(R.string.settings_sources_checking)
+                    is SourcesRefreshState.Updated -> stringResource(R.string.settings_sources_updated)
+                    is SourcesRefreshState.AlreadyUpToDate -> stringResource(R.string.settings_sources_up_to_date)
+                    else -> stringResource(R.string.settings_sources_desc)
+                },
+                onClick = { viewModel.refreshSources() }
             )
         }
 

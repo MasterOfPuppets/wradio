@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "id": "radio-browser-de1",
+      "parser": "radio-browser",
+      "baseUrl": "https://de1.api.radio-browser.info/",
+      "enabled": true,
+      "fallbackOnly": false
+    },
+    {
+      "id": "radio-browser-nl1",
+      "parser": "radio-browser",
+      "baseUrl": "https://nl1.api.radio-browser.info/",
+      "enabled": true,
+      "fallbackOnly": true
+    },
+    {
+      "id": "radio-browser-at1",
+      "parser": "radio-browser",
+      "baseUrl": "https://at1.api.radio-browser.info/",
+      "enabled": true,
+      "fallbackOnly": true
+    },
+    {
+      "id": "shoutcast",
+      "parser": "shoutcast",
+      "baseUrl": "https://directory.shoutcast.com/",
+      "enabled": false,
+      "fallbackOnly": false
+    }
+  ]
+}
+

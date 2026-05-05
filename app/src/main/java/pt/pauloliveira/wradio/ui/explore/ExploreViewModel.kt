@@ -10,22 +10,33 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import pt.pauloliveira.wradio.data.remote.source.SearchResult
+import pt.pauloliveira.wradio.data.remote.source.UnifiedSearchDataSource
 import pt.pauloliveira.wradio.domain.model.Station
 import pt.pauloliveira.wradio.domain.repository.StationRepository
+import pt.pauloliveira.wradio.domain.repository.SourceConfigRepository
 import pt.pauloliveira.wradio.service.connection.WRadioPlayerClient
 import javax.inject.Inject
 
 @HiltViewModel
 class ExploreViewModel @Inject constructor(
     private val repository: StationRepository,
-    private val playerClient: WRadioPlayerClient
+    private val playerClient: WRadioPlayerClient,
+    private val sourceConfigRepository: SourceConfigRepository,
+    private val unifiedSearchDataSource: UnifiedSearchDataSource
 ) : ViewModel() {
 
-    private val _remoteStations = MutableStateFlow<List<Station>>(emptyList())
+    init {
+        viewModelScope.launch {
+            sourceConfigRepository.refreshFromRemote()
+        }
+    }
+
+    private val _remoteResults = MutableStateFlow<List<SearchResult>>(emptyList())
     private val _searchState = MutableStateFlow<ExploreUiState>(ExploreUiState.Idle)
     val uiState: StateFlow<ExploreUiState> = combine(
         _searchState,
-        _remoteStations,
+        _remoteResults,
         repository.getAllStations()
     ) { searchState, remoteList, localList ->
 
@@ -36,7 +47,8 @@ class ExploreViewModel @Inject constructor(
         if (remoteList.isEmpty()) {
             searchState
         } else {
-            val wrappers = remoteList.map { remote ->
+            val wrappers = remoteList.map { result ->
+                val remote = result.station
                 val localMatch = localList.find { it.uuid == remote.uuid }
 
                 val status = when {
@@ -45,9 +57,19 @@ class ExploreViewModel @Inject constructor(
                     else -> StationStatus.Saved
                 }
 
-                ExploreStationWrapper(remote, status)
+                val sourceLabel = sourceIdToLabel(result.sourceId)
+                ExploreStationWrapper(remote, status, sourceLabel)
             }
-            ExploreUiState.Success(wrappers)
+
+            // Only show source labels if results come from multiple providers
+            val distinctLabels = wrappers.map { it.sourceLabel }.distinct()
+            val finalWrappers = if (distinctLabels.size <= 1) {
+                wrappers.map { it.copy(sourceLabel = "") }
+            } else {
+                wrappers
+            }
+
+            ExploreUiState.Success(finalWrappers)
         }
     }.stateIn(
         scope = viewModelScope,
@@ -62,18 +84,18 @@ class ExploreViewModel @Inject constructor(
             _searchState.value = ExploreUiState.Loading
 
             try {
-                val results = repository.searchRemoteStations(query)
+                val results = unifiedSearchDataSource.search(query)
 
                 if (results.isEmpty()) {
                     _searchState.value = ExploreUiState.Error.NoResults(query)
-                    _remoteStations.value = emptyList()
+                    _remoteResults.value = emptyList()
                 } else {
-                    _remoteStations.value = results
+                    _remoteResults.value = results
                     _searchState.value = ExploreUiState.Idle
                 }
             } catch (e: Exception) {
                 _searchState.value = ExploreUiState.Error.Network(e.message ?: "Unknown error")
-                _remoteStations.value = emptyList()
+                _remoteResults.value = emptyList()
             }
         }
     }
@@ -92,6 +114,15 @@ class ExploreViewModel @Inject constructor(
                 val allStations = repository.getAllStations().first()
                 playerClient.updatePlaylistContext(allStations, station.uuid)
             }
+        }
+    }
+
+    private fun sourceIdToLabel(sourceId: String): String {
+        return when {
+            sourceId.startsWith("radio-browser") -> "RB"
+            sourceId.startsWith("shoutcast") -> "SC"
+            sourceId.startsWith("icecast") -> "IC"
+            else -> sourceId.take(2).uppercase()
         }
     }
 }

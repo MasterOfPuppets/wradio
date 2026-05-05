@@ -1,0 +1,16 @@
+# WRadio Backlog
+
+## Pending / Ideas
+
+- [ ] Shoutcast integration (waiting for API key approval — likely won't happen)
+- [ ] Export/Import/Merge "My Radios" station list (JSON backup, share between devices, merge without losing existing)
+- [ ] Enhanced station logo fallback (Option 7: Google S2 favicon lookup + gradient fallback). Only fetch favicon when station is saved to "My Radios" to avoid slowing down search results.
+- [ ] Sleep timer — stop playback after X minutes
+- [ ] Home screen widget — mini-player on Android launcher
+- [ ] Shake to skip — shake device to jump to next station
+- [ ] Now playing metadata history — show last N tracks in future fullscreen player (TBD if worth it)
+
+## Notes
+
+- Source label mechanism (RB/SC/IC) exists in code but is hidden when only one provider returns results. Will show automatically when a second provider is active.
+- Favourites concept is already covered by "sort by totalPlayTime desc" — most listened = favourites.

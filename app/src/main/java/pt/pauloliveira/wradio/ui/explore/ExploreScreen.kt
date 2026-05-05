@@ -261,6 +261,15 @@ fun RemoteStationItem(
             }
         }
 
+        if (wrapper.sourceLabel.isNotBlank()) {
+            Text(
+                text = wrapper.sourceLabel,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(horizontal = 8.dp)
+            )
+        }
+
         if (wrapper.status == StationStatus.Saved) {
             Icon(
                 imageVector = Icons.Default.Check,

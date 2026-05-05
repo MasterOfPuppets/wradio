@@ -54,6 +54,12 @@
     <string name="settings_group_about">About</string>
     <string name="settings_version">Version</string>
     <string name="settings_terms">Terms and Conditions</string>
+    <string name="settings_group_sources">Radio Sources</string>
+    <string name="settings_update_sources">Update Sources</string>
+    <string name="settings_sources_desc">Check for new radio directories.</string>
+    <string name="settings_sources_checking">Checking…</string>
+    <string name="settings_sources_updated">Sources updated!</string>
+    <string name="settings_sources_up_to_date">Already up to date.</string>
     <string name="settings_group_data">Data &amp; Storage</string>
     <string name="settings_clear_data">Factory Reset</string>
     <string name="settings_clear_data_desc">Delete all stations and reset settings</string>
