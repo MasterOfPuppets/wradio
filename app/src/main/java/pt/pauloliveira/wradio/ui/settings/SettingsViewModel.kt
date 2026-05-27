@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import pt.pauloliveira.wradio.data.remote.AppUpdate
+import pt.pauloliveira.wradio.data.remote.UpdateChecker
 import pt.pauloliveira.wradio.domain.repository.PreferencesRepository
 import pt.pauloliveira.wradio.domain.repository.SourceConfigRepository
 import pt.pauloliveira.wradio.domain.repository.StationRepository
@@ -17,7 +19,8 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val stationRepository: StationRepository,
     private val preferencesRepository: PreferencesRepository,
-    private val sourceConfigRepository: SourceConfigRepository
+    private val sourceConfigRepository: SourceConfigRepository,
+    private val updateChecker: UpdateChecker
 ) : ViewModel() {
 
     val bufferSize: StateFlow<Int> = preferencesRepository.getBufferSeconds()
@@ -78,6 +81,25 @@ class SettingsViewModel @Inject constructor(
             }
         }
     }
+
+    private val _updateState = MutableStateFlow<UpdateState>(UpdateState.Idle)
+    val updateState: StateFlow<UpdateState> = _updateState
+
+    init {
+        checkForUpdate()
+    }
+
+    fun checkForUpdate() {
+        viewModelScope.launch {
+            _updateState.value = UpdateState.Checking
+            val update = updateChecker.checkForUpdate()
+            _updateState.value = if (update != null) {
+                UpdateState.Available(update)
+            } else {
+                UpdateState.UpToDate
+            }
+        }
+    }
 }
 
 sealed interface SourcesRefreshState {
@@ -85,4 +107,11 @@ sealed interface SourcesRefreshState {
     data object Loading : SourcesRefreshState
     data object Updated : SourcesRefreshState
     data object AlreadyUpToDate : SourcesRefreshState
+}
+
+sealed interface UpdateState {
+    data object Idle : UpdateState
+    data object Checking : UpdateState
+    data object UpToDate : UpdateState
+    data class Available(val update: AppUpdate) : UpdateState
 }

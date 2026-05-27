@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.VolumeDown
@@ -65,6 +66,7 @@ fun SettingsScreen(
     val duckLevel by viewModel.duckLevel.collectAsState()
     val bluetoothAutoPause by viewModel.bluetoothAutoPause.collectAsState()
     val sourcesRefreshState by viewModel.sourcesRefreshState.collectAsState()
+    val updateState by viewModel.updateState.collectAsState()
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showBufferDialog by remember { mutableStateOf(false) }
@@ -116,8 +118,40 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.Default.Info,
                 title = stringResource(R.string.settings_version),
-                subtitle = appVersion
+                subtitle = when (updateState) {
+                    is UpdateState.Checking -> "$appVersion (${stringResource(R.string.settings_update_checking)})"
+                    is UpdateState.UpToDate -> "$appVersion (${stringResource(R.string.settings_update_up_to_date)})"
+                    is UpdateState.Available -> "$appVersion → ${(updateState as UpdateState.Available).update.latestVersion}"
+                    else -> appVersion
+                },
+                onClick = {
+                    val state = updateState
+                    if (state is UpdateState.Available) {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, state.update.downloadUrl.toUri())
+                            context.startActivity(intent)
+                        } catch (_: Exception) { }
+                    } else {
+                        viewModel.checkForUpdate()
+                    }
+                }
             )
+            if (updateState is UpdateState.Available) {
+                SettingsItem(
+                    icon = Icons.Default.NewReleases,
+                    title = stringResource(R.string.settings_update_available),
+                    subtitle = stringResource(R.string.settings_update_tap_to_download),
+                    onClick = {
+                        val state = updateState
+                        if (state is UpdateState.Available) {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, state.update.downloadUrl.toUri())
+                                context.startActivity(intent)
+                            } catch (_: Exception) { }
+                        }
+                    }
+                )
+            }
             SettingsItem(
                 icon = Icons.Default.Description,
                 title = stringResource(R.string.settings_terms),

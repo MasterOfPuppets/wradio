@@ -97,4 +97,10 @@
     <!-- Feedback Messages -->
     <string name="msg_station_deleted">Station deleted.</string>
     <string name="msg_station_saved">Station saved.</string>
+
+    <!-- Update Check -->
+    <string name="settings_update_checking">checking…</string>
+    <string name="settings_update_up_to_date">up to date</string>
+    <string name="settings_update_available">New version available!</string>
+    <string name="settings_update_tap_to_download">Tap to open download page.</string>
 </resources>
