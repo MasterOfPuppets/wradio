@@ -9,14 +9,20 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
+import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Metadata
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.extractor.metadata.icy.IcyInfo
+import androidx.media3.session.LibraryResult
+import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
+import com.google.common.collect.ImmutableList
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,7 +38,12 @@ import javax.inject.Inject
 import kotlin.math.round
 
 @AndroidEntryPoint
-class RadioService : MediaSessionService() {
+class RadioService : MediaLibraryService() {
+
+    companion object {
+        private const val MEDIA_ROOT_ID = "wradio_root"
+        private const val MEDIA_MY_RADIOS_ID = "wradio_my_radios"
+    }
 
     @Inject
     lateinit var player: Player
@@ -41,7 +52,7 @@ class RadioService : MediaSessionService() {
     @Inject
     lateinit var preferencesRepository: PreferencesRepository
 
-    private var mediaSession: MediaSession? = null
+    private var mediaLibrarySession: MediaLibrarySession? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var sessionStartTime: Long = 0
     private var currentPlayingUuid: String? = null
@@ -69,7 +80,6 @@ class RadioService : MediaSessionService() {
     private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         when (focusChange) {
             AudioManager.AUDIOFOCUS_LOSS -> {
-                // Permanent loss (e.g. phone call started) — stop and re-play when regained
                 wasPlayingBeforeFocusLoss = player.isPlaying
                 if (player.isPlaying) player.stop()
             }
@@ -92,6 +102,7 @@ class RadioService : MediaSessionService() {
             }
         }
     }
+
     private val playerListener = object : Player.Listener {
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -137,27 +148,177 @@ class RadioService : MediaSessionService() {
         }
     }
 
+    private val librarySessionCallback = object : MediaLibrarySession.Callback {
+
+        override fun onGetLibraryRoot(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            params: LibraryParams?
+        ): ListenableFuture<LibraryResult<MediaItem>> {
+            val rootItem = MediaItem.Builder()
+                .setMediaId(MEDIA_ROOT_ID)
+                .setMediaMetadata(
+                    MediaMetadata.Builder()
+                        .setTitle("WRadio")
+                        .setIsBrowsable(true)
+                        .setIsPlayable(false)
+                        .setMediaType(MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
+                        .build()
+                )
+                .build()
+            return Futures.immediateFuture(LibraryResult.ofItem(rootItem, params))
+        }
+
+        override fun onGetChildren(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            parentId: String,
+            page: Int,
+            pageSize: Int,
+            params: LibraryParams?
+        ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
+            return when (parentId) {
+                MEDIA_ROOT_ID -> {
+                    val myRadiosFolder = MediaItem.Builder()
+                        .setMediaId(MEDIA_MY_RADIOS_ID)
+                        .setMediaMetadata(
+                            MediaMetadata.Builder()
+                                .setTitle("My Radios")
+                                .setIsBrowsable(true)
+                                .setIsPlayable(false)
+                                .setMediaType(MediaMetadata.MEDIA_TYPE_FOLDER_RADIO_STATIONS)
+                                .build()
+                        )
+                        .build()
+                    Futures.immediateFuture(
+                        LibraryResult.ofItemList(ImmutableList.of(myRadiosFolder), params)
+                    )
+                }
+                MEDIA_MY_RADIOS_ID -> {
+                    val stations = runBlocking {
+                        repository.getAllStations().first()
+                    }
+                    val mediaItems = stations.map { station ->
+                        buildBrowsableMediaItem(station)
+                    }
+                    Futures.immediateFuture(
+                        LibraryResult.ofItemList(ImmutableList.copyOf(mediaItems), params)
+                    )
+                }
+                else -> {
+                    Futures.immediateFuture(
+                        LibraryResult.ofError(LibraryResult.RESULT_ERROR_BAD_VALUE)
+                    )
+                }
+            }
+        }
+
+        override fun onGetItem(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            mediaId: String
+        ): ListenableFuture<LibraryResult<MediaItem>> {
+            val stations = runBlocking {
+                repository.getAllStations().first()
+            }
+            val station = stations.find { it.uuid == mediaId }
+            return if (station != null) {
+                Futures.immediateFuture(
+                    LibraryResult.ofItem(buildPlayableMediaItem(station), null)
+                )
+            } else {
+                Futures.immediateFuture(
+                    LibraryResult.ofError(LibraryResult.RESULT_ERROR_BAD_VALUE)
+                )
+            }
+        }
+
+        override fun onAddMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>
+        ): ListenableFuture<MutableList<MediaItem>> {
+            // Resolve media items (Android Auto sends items without URI)
+            val stations = runBlocking {
+                repository.getAllStations().first()
+            }
+            val resolvedItems = mediaItems.map { requestedItem ->
+                val station = stations.find { it.uuid == requestedItem.mediaId }
+                if (station != null) {
+                    buildPlayableMediaItem(station)
+                } else {
+                    requestedItem
+                }
+            }.toMutableList()
+            return Futures.immediateFuture(resolvedItems)
+        }
+    }
+
+    private fun buildBrowsableMediaItem(station: pt.pauloliveira.wradio.domain.model.Station): MediaItem {
+        val extras = Bundle().apply {
+            putString(WRadioPlayerClient.EXTRA_STATION_UUID, station.uuid)
+        }
+        return MediaItem.Builder()
+            .setMediaId(station.uuid)
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(station.name)
+                    .setArtist(station.tags.firstOrNull() ?: station.countryCode ?: "")
+                    .setIsBrowsable(false)
+                    .setIsPlayable(true)
+                    .setMediaType(MediaMetadata.MEDIA_TYPE_RADIO_STATION)
+                    .setExtras(extras)
+                    .build()
+            )
+            .build()
+    }
+
+    private fun buildPlayableMediaItem(station: pt.pauloliveira.wradio.domain.model.Station): MediaItem {
+        var cleanUrl = station.streamUrl
+        if (cleanUrl.startsWith("icy://") || cleanUrl.startsWith("icyx://")) {
+            cleanUrl = cleanUrl.replace("icy://", "http://")
+                .replace("icyx://", "http://")
+        }
+        val extras = Bundle().apply {
+            putString(WRadioPlayerClient.EXTRA_STATION_UUID, station.uuid)
+        }
+        return MediaItem.Builder()
+            .setMediaId(station.uuid)
+            .setUri(cleanUrl)
+            .setMediaMetadata(
+                MediaMetadata.Builder()
+                    .setTitle(station.name)
+                    .setArtist(station.tags.firstOrNull() ?: station.countryCode ?: "")
+                    .setIsBrowsable(false)
+                    .setIsPlayable(true)
+                    .setMediaType(MediaMetadata.MEDIA_TYPE_RADIO_STATION)
+                    .setExtras(extras)
+                    .build()
+            )
+            .build()
+    }
+
     override fun onCreate() {
         super.onCreate()
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        mediaSession = MediaSession.Builder(this, player).build()
+        mediaLibrarySession = MediaLibrarySession.Builder(this, player, librarySessionCallback).build()
         player.addListener(playerListener)
         requestAudioFocus()
         registerBluetoothReceiver()
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
-        return mediaSession
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? {
+        return mediaLibrarySession
     }
 
     override fun onDestroy() {
         abandonAudioFocus()
         unregisterReceiver(bluetoothReceiver)
-        mediaSession?.run {
+        mediaLibrarySession?.run {
             player.removeListener(playerListener)
             player.release()
             release()
-            mediaSession = null
+            mediaLibrarySession = null
         }
         serviceScope.cancel()
         super.onDestroy()
