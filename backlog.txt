@@ -1,16 +1,25 @@
 # WRadio Backlog
 
+## Done
+
+- [x] Android Auto support with browse tree (v1.3/v1.4)
+- [x] In-app update checker via GitHub Releases API (v1.4)
+- [x] Multi-directory search infrastructure (Radio Browser)
+- [x] Source label mechanism (hidden while single provider)
+- [x] APK auto-naming (wradio-{version}.apk)
+- [x] Android Auto search implementation with local + remote results (v1.5)
+
 ## Pending / Ideas
 
-- [ ] Shoutcast integration (waiting for API key approval — likely won't happen)
-- [ ] Export/Import/Merge "My Radios" station list (JSON backup, share between devices, merge without losing existing)
+- [ ] Export/Import/Merge "My Radios" station list (JSON backup, share between devices, merge without losing existing). Consider cloud sync (Google Drive / Dropbox) as alternative or complement to local file.
 - [ ] Enhanced station logo fallback (Option 7: Google S2 favicon lookup + gradient fallback). Only fetch favicon when station is saved to "My Radios" to avoid slowing down search results.
 - [ ] Sleep timer — stop playback after X minutes
 - [ ] Home screen widget — mini-player on Android launcher
-- [ ] Shake to skip — shake device to jump to next station
 - [ ] Now playing metadata history — show last N tracks in future fullscreen player (TBD if worth it)
+- [ ] Shoutcast integration (waiting for API key approval — likely won't happen)
 
 ## Notes
 
 - Source label mechanism (RB/SC/IC) exists in code but is hidden when only one provider returns results. Will show automatically when a second provider is active.
 - Favourites concept is already covered by "sort by totalPlayTime desc" — most listened = favourites.
+- Update checker currently works with `v1.4`-style tags and GitHub's `latest` release, but future hardening should fetch/compare releases by highest semantic version so release ordering quirks do not affect update detection.

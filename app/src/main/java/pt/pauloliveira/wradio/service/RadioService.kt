@@ -32,7 +32,10 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.supervisorScope
+import pt.pauloliveira.wradio.data.remote.source.UnifiedSearchDataSource
 import pt.pauloliveira.wradio.domain.repository.PreferencesRepository
+import pt.pauloliveira.wradio.domain.repository.SourceConfigRepository
 import pt.pauloliveira.wradio.domain.repository.StationRepository
 import pt.pauloliveira.wradio.service.connection.WRadioPlayerClient
 import javax.inject.Inject
@@ -44,6 +47,7 @@ class RadioService : MediaLibraryService() {
     companion object {
         private const val MEDIA_ROOT_ID = "wradio_root"
         private const val MEDIA_MY_RADIOS_ID = "wradio_my_radios"
+        private const val MEDIA_SEARCH_RESULTS_ID = "wradio_search_results"
     }
 
     @Inject
@@ -52,6 +56,10 @@ class RadioService : MediaLibraryService() {
     lateinit var repository: StationRepository
     @Inject
     lateinit var preferencesRepository: PreferencesRepository
+    @Inject
+    lateinit var unifiedSearchDataSource: UnifiedSearchDataSource
+    @Inject
+    lateinit var sourceConfigRepository: SourceConfigRepository
 
     private var mediaLibrarySession: MediaLibrarySession? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -82,11 +90,11 @@ class RadioService : MediaLibraryService() {
         when (focusChange) {
             AudioManager.AUDIOFOCUS_LOSS -> {
                 wasPlayingBeforeFocusLoss = player.isPlaying
-                if (player.isPlaying) player.stop()
+                if (player.isPlaying) player.pause()
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
                 wasPlayingBeforeFocusLoss = player.isPlaying
-                if (player.isPlaying) player.stop()
+                if (player.isPlaying) player.pause()
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                 val duckLevel = runBlocking {
@@ -97,6 +105,7 @@ class RadioService : MediaLibraryService() {
             AudioManager.AUDIOFOCUS_GAIN -> {
                 player.volume = 1.0f
                 if (wasPlayingBeforeFocusLoss) {
+                    requestAudioFocus()
                     player.play()
                     wasPlayingBeforeFocusLoss = false
                 }
@@ -150,6 +159,8 @@ class RadioService : MediaLibraryService() {
     }
 
     private val librarySessionCallback = object : MediaLibrarySession.Callback {
+
+        private var lastSearchResults = mutableListOf<pt.pauloliveira.wradio.domain.model.Station>()
 
         override fun onConnect(
             session: MediaSession,
@@ -216,6 +227,14 @@ class RadioService : MediaLibraryService() {
                         LibraryResult.ofItemList(ImmutableList.copyOf(mediaItems), params)
                     )
                 }
+                MEDIA_SEARCH_RESULTS_ID -> {
+                    val mediaItems = lastSearchResults.map { station ->
+                        buildPlayableMediaItem(station)
+                    }
+                    Futures.immediateFuture(
+                        LibraryResult.ofItemList(ImmutableList.copyOf(mediaItems), params)
+                    )
+                }
                 else -> {
                     Futures.immediateFuture(
                         LibraryResult.ofError(SessionError.ERROR_BAD_VALUE)
@@ -249,19 +268,90 @@ class RadioService : MediaLibraryService() {
             controller: MediaSession.ControllerInfo,
             mediaItems: MutableList<MediaItem>
         ): ListenableFuture<MutableList<MediaItem>> {
-            // Resolve media items (Android Auto sends items without URI)
             val stations = runBlocking {
                 repository.getAllStations().first()
             }
-            val resolvedItems = mediaItems.map { requestedItem ->
-                val station = stations.find { it.uuid == requestedItem.mediaId }
-                if (station != null) {
-                    buildPlayableMediaItem(station)
+            val resolvedItems = mediaItems.flatMap { requestedItem ->
+                // Voice search: Assistant sends a MediaItem with searchQuery in extras
+                val searchQuery = requestedItem.requestMetadata.searchQuery
+
+                if (!searchQuery.isNullOrBlank()) {
+                    // Find best match in My Radios by name
+                    val match = stations.firstOrNull { station ->
+                        station.name.contains(searchQuery, ignoreCase = true)
+                    }
+                    if (match != null) {
+                        // Build full playlist starting from matched station
+                        val startIndex = stations.indexOf(match)
+                        val reordered = stations.subList(startIndex, stations.size) +
+                                stations.subList(0, startIndex)
+                        reordered.map { buildPlayableMediaItem(it) }
+                    } else {
+                        listOf(requestedItem)
+                    }
                 } else {
-                    requestedItem
+                    // Direct selection by UUID (browse)
+                    val station = stations.find { it.uuid == requestedItem.mediaId }
+                    if (station != null) {
+                        // Build full playlist starting from selected station
+                        val startIndex = stations.indexOf(station)
+                        val reordered = stations.subList(startIndex, stations.size) +
+                                stations.subList(0, startIndex)
+                        reordered.map { buildPlayableMediaItem(it) }
+                    } else {
+                        listOf(requestedItem)
+                    }
                 }
             }.toMutableList()
             return Futures.immediateFuture(resolvedItems)
+        }
+
+        override fun onSearch(
+            session: MediaLibrarySession,
+            browser: MediaSession.ControllerInfo,
+            query: String,
+            params: LibraryParams?
+        ): ListenableFuture<LibraryResult<Void>> {
+            try {
+                // Search both local (My Radios) and remote (Radio Browser) in background
+                serviceScope.launch {
+                    try {
+                        // Get local stations
+                        val localStations = repository.getAllStations().first()
+                        val remoteResults = unifiedSearchDataSource.search(query)
+
+                        // Filter local results by query (case-insensitive search in name and tags)
+                        val localMatches = localStations.filter { station ->
+                            station.name.contains(query, ignoreCase = true) ||
+                                    station.tags.any { it.contains(query, ignoreCase = true) }
+                        }
+
+                        // Combine local and remote results, avoiding duplicates (by UUID)
+                        val seenUuids = mutableSetOf<String>()
+                        lastSearchResults.clear()
+
+                        // Add local matches first
+                        localMatches.forEach { station ->
+                            if (seenUuids.add(station.uuid)) {
+                                lastSearchResults.add(station)
+                            }
+                        }
+
+                        // Add remote results (deduped)
+                        remoteResults.forEach { result ->
+                            if (seenUuids.add(result.station.uuid)) {
+                                lastSearchResults.add(result.station)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        // Log error silently
+                    }
+                }
+
+                return Futures.immediateFuture(LibraryResult.ofVoid(params))
+            } catch (e: Exception) {
+                return Futures.immediateFuture(LibraryResult.ofError(SessionError.ERROR_BAD_VALUE))
+            }
         }
     }
 
