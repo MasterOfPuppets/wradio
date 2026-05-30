@@ -187,7 +187,7 @@ fun StationItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             StationLogo(
-                url = station.stationLogo,
+                logoBlob = station.logoBlob,
                 uuid = station.uuid,
                 modifier = Modifier.size(56.dp),
                 shape = RoundedCornerShape(8.dp)

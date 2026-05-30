@@ -7,7 +7,7 @@ import pt.pauloliveira.wradio.data.local.entity.StationEntity
 
 @Database(
     entities = [StationEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class WRadioDatabase : RoomDatabase() {

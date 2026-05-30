@@ -1,8 +1,12 @@
 package pt.pauloliveira.wradio.ui.explore
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -10,13 +14,18 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import pt.pauloliveira.wradio.data.remote.source.SearchResult
 import pt.pauloliveira.wradio.data.remote.source.UnifiedSearchDataSource
 import pt.pauloliveira.wradio.domain.model.Station
 import pt.pauloliveira.wradio.domain.repository.StationRepository
 import pt.pauloliveira.wradio.domain.repository.SourceConfigRepository
 import pt.pauloliveira.wradio.service.connection.WRadioPlayerClient
+import java.io.ByteArrayOutputStream
+import java.net.URL
 import javax.inject.Inject
+
+private const val LOGO_SIZE = 128
 
 @HiltViewModel
 class ExploreViewModel @Inject constructor(
@@ -108,12 +117,53 @@ class ExploreViewModel @Inject constructor(
 
     fun importStation(station: Station) {
         viewModelScope.launch {
-            repository.saveStation(station)
+            val stationWithLogo = if (station.logoBlob == null && !station.faviconUrl.isNullOrBlank()) {
+                val blob = downloadAndResizeLogo(station.faviconUrl)
+                station.copy(logoBlob = blob)
+            } else {
+                station
+            }
+            repository.saveStation(stationWithLogo)
             val currentPlaying = playerClient.playerState.value.station
             if (currentPlaying?.uuid == station.uuid) {
                 val allStations = repository.getAllStations().first()
                 playerClient.updatePlaylistContext(allStations, station.uuid)
             }
+        }
+    }
+
+    private suspend fun downloadAndResizeLogo(url: String): ByteArray? = withContext(Dispatchers.IO) {
+        try {
+            val connection = URL(url).openConnection().apply {
+                connectTimeout = 5000
+                readTimeout = 5000
+            }
+            val bytes = connection.getInputStream().use { it.readBytes() }
+            val original = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return@withContext null
+
+            // Center-crop to square
+            val cropSize = minOf(original.width, original.height)
+            val xOffset = (original.width - cropSize) / 2
+            val yOffset = (original.height - cropSize) / 2
+            val cropped = Bitmap.createBitmap(original, xOffset, yOffset, cropSize, cropSize)
+            val resized = Bitmap.createScaledBitmap(cropped, LOGO_SIZE, LOGO_SIZE, true)
+
+            if (cropped != original) original.recycle()
+            if (resized != cropped) cropped.recycle()
+
+            val outputStream = ByteArrayOutputStream()
+            @Suppress("DEPRECATION")
+            val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Bitmap.CompressFormat.WEBP_LOSSY
+            } else {
+                Bitmap.CompressFormat.WEBP
+            }
+            resized.compress(format, 80, outputStream)
+            resized.recycle()
+
+            outputStream.toByteArray()
+        } catch (_: Exception) {
+            null
         }
     }
 

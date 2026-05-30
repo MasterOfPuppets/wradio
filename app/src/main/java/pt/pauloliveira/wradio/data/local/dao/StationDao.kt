@@ -23,6 +23,9 @@ interface StationDao {
     @Query("SELECT * FROM stations WHERE uuid = :uuid")
     suspend fun getStation(uuid: String): StationEntity?
 
+    @Query("SELECT logoBlob FROM stations WHERE uuid = :uuid")
+    suspend fun getLogoBlob(uuid: String): ByteArray?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertStation(station: StationEntity)
 

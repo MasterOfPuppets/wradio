@@ -56,7 +56,7 @@ fun MiniPlayer(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             StationLogo(
-                url = station.stationLogo,
+                logoBlob = station.logoBlob,
                 uuid = station.uuid,
                 modifier = Modifier.size(48.dp),
                 shape = RoundedCornerShape(8.dp)

@@ -64,11 +64,11 @@ fun ManagementScreen(
         AddEditStationDialog(
             stationToEdit = stationToEdit,
             onDismiss = { showDialog = false },
-            onSave = { name, url ->
+            onSave = { name, url, logoBlob ->
                 if (stationToEdit == null) {
-                    viewModel.addManualStation(name, url)
+                    viewModel.addManualStation(name, url, logoBlob)
                 } else {
-                    viewModel.updateStation(stationToEdit!!, name, url)
+                    viewModel.updateStation(stationToEdit!!, name, url, logoBlob)
                 }
                 showDialog = false
                 scope.launch {
@@ -182,7 +182,7 @@ fun ManagementItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             StationLogo(
-                url = station.stationLogo,
+                logoBlob = station.logoBlob,
                 uuid = station.uuid,
                 modifier = Modifier.size(40.dp),
                 shape = RoundedCornerShape(4.dp)

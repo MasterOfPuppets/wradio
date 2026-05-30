@@ -24,7 +24,7 @@ object DatabaseModule {
             context,
             WRadioDatabase::class.java,
             "wradio_db"
-        ).build()
+        ).fallbackToDestructiveMigration().build()
     }
 
     @Provides

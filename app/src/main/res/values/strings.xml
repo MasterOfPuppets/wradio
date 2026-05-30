@@ -40,6 +40,9 @@
     <string name="dialog_title_edit">Edit Station</string>
     <string name="dialog_label_name">Station Name</string>
     <string name="dialog_label_url">Stream URL</string>
+    <string name="dialog_label_logo_url">Logo URL (optional)</string>
+    <string name="action_choose_gallery">Choose from gallery</string>
+    <string name="action_load_logo">Load</string>
     <string name="action_save">Save</string>
     <string name="action_cancel">Cancel</string>
 

@@ -32,6 +32,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <provider
+            android:name=".data.content.LogoContentProvider"
+            android:authorities="pt.pauloliveira.wradio.logos"
+            android:exported="true"
+            android:grantUriPermissions="true" />
+
         <service
             android:name=".service.RadioService"
             android:exported="true"

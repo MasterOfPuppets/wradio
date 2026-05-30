@@ -231,7 +231,8 @@ fun RemoteStationItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         StationLogo(
-            url = wrapper.station.stationLogo,
+            url = wrapper.station.faviconUrl,
+            logoBlob = wrapper.station.logoBlob,
             uuid = wrapper.station.uuid,
             modifier = Modifier.size(48.dp),
             shape = RoundedCornerShape(8.dp)
@@ -311,7 +312,8 @@ fun StationDetailSheet(
                 modifier = Modifier.padding(bottom = 16.dp)
             ) {
                 StationLogo(
-                    url = station.stationLogo,
+                    url = station.faviconUrl,
+                    logoBlob = station.logoBlob,
                     uuid = station.uuid,
                     modifier = Modifier.size(64.dp),
                     shape = RoundedCornerShape(8.dp)

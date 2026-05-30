@@ -10,6 +10,7 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
+import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -140,11 +141,10 @@ class RadioService : MediaLibraryService() {
                         val currentItem = player.currentMediaItem ?: return
                         val currentMeta = currentItem.mediaMetadata
 
-                        if (currentMeta.title.toString() == streamTitle) return
+                        if (currentMeta.artist?.toString() == streamTitle) return
 
                         val newMeta = currentMeta.buildUpon()
-                            .setTitle(streamTitle)
-                            .setArtist(currentMeta.artist ?: currentMeta.title)
+                            .setArtist(streamTitle)
                             .build()
 
                         val newItem = currentItem.buildUpon()
@@ -359,18 +359,22 @@ class RadioService : MediaLibraryService() {
         val extras = Bundle().apply {
             putString(WRadioPlayerClient.EXTRA_STATION_UUID, station.uuid)
         }
+        val metadataBuilder = MediaMetadata.Builder()
+            .setTitle(station.name)
+            .setArtist(station.tags.firstOrNull() ?: "")
+            .setAlbumTitle(station.tags.firstOrNull() ?: "")
+            .setIsBrowsable(false)
+            .setIsPlayable(true)
+            .setMediaType(MediaMetadata.MEDIA_TYPE_RADIO_STATION)
+            .setExtras(extras)
+        if (station.logoBlob != null) {
+            metadataBuilder.setArtworkUri(
+                pt.pauloliveira.wradio.data.content.LogoContentProvider.getLogoUri(station.uuid)
+            )
+        }
         return MediaItem.Builder()
             .setMediaId(station.uuid)
-            .setMediaMetadata(
-                MediaMetadata.Builder()
-                    .setTitle(station.name)
-                    .setArtist(station.tags.firstOrNull() ?: station.countryCode ?: "")
-                    .setIsBrowsable(false)
-                    .setIsPlayable(true)
-                    .setMediaType(MediaMetadata.MEDIA_TYPE_RADIO_STATION)
-                    .setExtras(extras)
-                    .build()
-            )
+            .setMediaMetadata(metadataBuilder.build())
             .build()
     }
 
@@ -383,19 +387,23 @@ class RadioService : MediaLibraryService() {
         val extras = Bundle().apply {
             putString(WRadioPlayerClient.EXTRA_STATION_UUID, station.uuid)
         }
+        val metadataBuilder = MediaMetadata.Builder()
+            .setTitle(station.name)
+            .setArtist(station.tags.firstOrNull() ?: "")
+            .setAlbumTitle(station.tags.firstOrNull() ?: "")
+            .setIsBrowsable(false)
+            .setIsPlayable(true)
+            .setMediaType(MediaMetadata.MEDIA_TYPE_RADIO_STATION)
+            .setExtras(extras)
+        if (station.logoBlob != null) {
+            metadataBuilder.setArtworkUri(
+                pt.pauloliveira.wradio.data.content.LogoContentProvider.getLogoUri(station.uuid)
+            )
+        }
         return MediaItem.Builder()
             .setMediaId(station.uuid)
             .setUri(cleanUrl)
-            .setMediaMetadata(
-                MediaMetadata.Builder()
-                    .setTitle(station.name)
-                    .setArtist(station.tags.firstOrNull() ?: station.countryCode ?: "")
-                    .setIsBrowsable(false)
-                    .setIsPlayable(true)
-                    .setMediaType(MediaMetadata.MEDIA_TYPE_RADIO_STATION)
-                    .setExtras(extras)
-                    .build()
-            )
+            .setMediaMetadata(metadataBuilder.build())
             .build()
     }
 

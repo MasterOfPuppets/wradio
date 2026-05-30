@@ -23,7 +23,8 @@ import kotlin.math.absoluteValue
 
 @Composable
 fun StationLogo(
-    url: String?,
+    logoBlob: ByteArray? = null,
+    url: String? = null,
     uuid: String,
     modifier: Modifier = Modifier,
     shape: Shape
@@ -33,18 +34,24 @@ fun StationLogo(
         Color.hsv(hue, 0.65f, 0.8f)
     }
 
+    val imageData: Any? = logoBlob ?: url
+
     Box(modifier = modifier.clip(shape)) {
-        SubcomposeAsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(url)
-                .crossfade(true)
-                .build(),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
-            loading = { ColoredPlaceholder(dynamicColor) },
-            error = { ColoredPlaceholder(dynamicColor) }
-        )
+        if (imageData != null) {
+            SubcomposeAsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(imageData)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                loading = { ColoredPlaceholder(dynamicColor) },
+                error = { ColoredPlaceholder(dynamicColor) }
+            )
+        } else {
+            ColoredPlaceholder(dynamicColor)
+        }
     }
 }
 

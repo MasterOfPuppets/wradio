@@ -24,13 +24,13 @@ class ManagementViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
-    fun addManualStation(name: String, url: String) {
+    fun addManualStation(name: String, url: String, logoBlob: ByteArray? = null) {
         viewModelScope.launch {
             val newStation = Station(
                 uuid = UUID.randomUUID().toString(),
                 name = name,
                 streamUrl = url,
-                stationLogo = null,
+                logoBlob = logoBlob,
                 countryCode = null,
                 homepage = null,
                 codec = null,
@@ -46,11 +46,12 @@ class ManagementViewModel @Inject constructor(
         }
     }
 
-    fun updateStation(station: Station, newName: String, newUrl: String) {
+    fun updateStation(station: Station, newName: String, newUrl: String, newLogoBlob: ByteArray? = null) {
         viewModelScope.launch {
             val updatedStation = station.copy(
                 name = newName,
                 streamUrl = newUrl,
+                logoBlob = newLogoBlob,
                 isManuallyAdded = true
             )
             repository.saveStation(updatedStation)
