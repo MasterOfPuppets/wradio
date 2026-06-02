@@ -60,8 +60,7 @@ fun HomeScreen(
 
         if (stations.isEmpty()) {
             HomeEmptyState(
-                modifier = Modifier.weight(1f),
-                onAddSamples = { viewModel.addSampleStations() }
+                modifier = Modifier.weight(1f)
             )
         } else {
             StationList(
@@ -126,8 +125,7 @@ fun HomeHeader(
 
 @Composable
 fun HomeEmptyState(
-    modifier: Modifier = Modifier,
-    onAddSamples: () -> Unit
+    modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -151,12 +149,6 @@ fun HomeEmptyState(
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            OutlinedButton(onClick = onAddSamples) {
-                Text(text = stringResource(R.string.action_add_sample_stations))
-            }
         }
     }
 }

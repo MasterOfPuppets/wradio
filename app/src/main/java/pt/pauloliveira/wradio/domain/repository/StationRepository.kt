@@ -13,9 +13,6 @@ interface StationRepository {
     /** Cria nova estação (UUID gerado internamente). Falha se já existe. */
     suspend fun createStation(name: String, streamUrl: String, logoBlob: ByteArray? = null, countryCode: String? = null, tags: List<String> = emptyList()): Station
 
-    /** Cria sample station — ignora se UUID já existe (preserva stats existentes). */
-    suspend fun createSampleStation(station: Station)
-
     /** Importa estação da API (UUID vem da API). Falha se já existe. */
     suspend fun importStation(station: Station)
 

@@ -62,6 +62,7 @@ class MainViewModel @Inject constructor(
 
     fun onBackupRestoreRejected() {
         viewModelScope.launch {
+            playerClient.stopAndClear()
             stationRepository.deleteAllStations()
             preferencesRepository.setResetPending(false)
             _showBackupDialog.value = false

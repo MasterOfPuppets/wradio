@@ -192,9 +192,11 @@ class WRadioPlayerClient @Inject constructor(
         _playerState.update { it.copy(isPlaying = false, isBuffering = false) }
     }
 
-    /** Para o player e limpa o state (card desaparece). Usar em DELETE/IMPORT. */
+    /** Para o player e limpa o state (card desaparece). Usar em DELETE/IMPORT/RESET. */
     suspend fun stopAndClear() {
-        getController().stop()
+        val ctrl = getController()
+        ctrl.stop()
+        ctrl.clearMediaItems()
         currentPlaylist = emptyList()
         _playerState.update { PlayerState() }
     }

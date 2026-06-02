@@ -16,6 +16,7 @@ import pt.pauloliveira.wradio.data.remote.UpdateChecker
 import pt.pauloliveira.wradio.domain.repository.PreferencesRepository
 import pt.pauloliveira.wradio.domain.repository.SourceConfigRepository
 import pt.pauloliveira.wradio.domain.repository.StationRepository
+import pt.pauloliveira.wradio.service.connection.WRadioPlayerClient
 import javax.inject.Inject
 
 @HiltViewModel
@@ -24,7 +25,8 @@ class SettingsViewModel @Inject constructor(
     private val stationRepository: StationRepository,
     private val preferencesRepository: PreferencesRepository,
     private val sourceConfigRepository: SourceConfigRepository,
-    private val updateChecker: UpdateChecker
+    private val updateChecker: UpdateChecker,
+    private val playerClient: WRadioPlayerClient
 ) : ViewModel() {
 
     val bufferSize: StateFlow<Int> = preferencesRepository.getBufferSeconds()
@@ -66,6 +68,7 @@ class SettingsViewModel @Inject constructor(
 
     fun clearAllData() {
         viewModelScope.launch {
+            playerClient.stopAndClear()
             stationRepository.deleteAllStations()
             preferencesRepository.resetToDefaults()
             // Set flag AFTER clearing preferences so it persists

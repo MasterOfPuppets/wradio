@@ -29,10 +29,6 @@ interface StationDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun createStation(station: StationEntity)
 
-    // CREATE SAMPLE: estação default — ignora se UUID já existe (preserva stats)
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun createSampleStation(station: StationEntity)
-
     // UPDATE: só campos editáveis (nome, url, logo, country, tags)
     @Query("""
         UPDATE stations SET 

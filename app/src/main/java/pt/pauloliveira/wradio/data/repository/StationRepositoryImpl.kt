@@ -63,10 +63,6 @@ class StationRepositoryImpl @Inject constructor(
         return station.toDomain()
     }
 
-    override suspend fun createSampleStation(station: Station) {
-        dao.createSampleStation(station.toEntity())
-    }
-
     override suspend fun importStation(station: Station) {
         require(station.name.isNotBlank()) { "Station name must not be empty" }
         require(station.streamUrl.isNotBlank()) { "Station URL must not be empty" }

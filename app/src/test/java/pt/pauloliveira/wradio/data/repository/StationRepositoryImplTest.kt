@@ -85,18 +85,6 @@ class StationRepositoryImplTest {
         repository.createStation(name = "Test", streamUrl = "   ")
     }
 
-    // === CREATE SAMPLE STATION ===
-
-    @Test
-    fun `createSampleStation calls dao with IGNORE strategy`() = runTest {
-        val station = makeStation(uuid = "sample_1", totalPlayTime = 500)
-
-        repository.createSampleStation(station)
-
-        coVerify { dao.createSampleStation(any()) }
-        coVerify(exactly = 0) { dao.createStation(any()) }
-    }
-
     // === IMPORT STATION ===
 
     @Test
