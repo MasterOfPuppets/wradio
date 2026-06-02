@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -111,24 +110,22 @@ class ExploreViewModel @Inject constructor(
 
     fun previewStation(station: Station) {
         viewModelScope.launch {
-            playerClient.play(station)
+            playerClient.play(station, preview = true)
         }
     }
 
     fun importStation(station: Station) {
         viewModelScope.launch {
+            // Parar o player antes de importar
+            playerClient.stopAndClear()
+
             val stationWithLogo = if (station.logoBlob == null && !station.faviconUrl.isNullOrBlank()) {
                 val blob = downloadAndResizeLogo(station.faviconUrl)
                 station.copy(logoBlob = blob)
             } else {
                 station
             }
-            repository.saveStation(stationWithLogo)
-            val currentPlaying = playerClient.playerState.value.station
-            if (currentPlaying?.uuid == station.uuid) {
-                val allStations = repository.getAllStations().first()
-                playerClient.updatePlaylistContext(allStations, station.uuid)
-            }
+            repository.importStation(stationWithLogo)
         }
     }
 

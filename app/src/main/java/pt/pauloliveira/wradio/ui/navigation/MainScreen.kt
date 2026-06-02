@@ -3,6 +3,7 @@ package pt.pauloliveira.wradio.ui.navigation
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -12,6 +13,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -26,6 +28,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import pt.pauloliveira.wradio.R
 import pt.pauloliveira.wradio.ui.home.HomeScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,6 +38,7 @@ fun MainScreen(
 ) {
     val navController = rememberNavController()
     val playerState by viewModel.playerState.collectAsState()
+    val showBackupDialog by viewModel.showBackupDialog.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(playerState.errorMsg) {
         playerState.errorMsg?.let { message ->
@@ -55,6 +59,24 @@ fun MainScreen(
         Screen.Management,
         Screen.Settings
     )
+
+    if (showBackupDialog) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text(stringResource(R.string.dialog_backup_title)) },
+            text = { Text(stringResource(R.string.dialog_backup_message)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.onBackupRestoreAccepted() }) {
+                    Text(stringResource(R.string.action_restore))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.onBackupRestoreRejected() }) {
+                    Text(stringResource(R.string.action_start_fresh))
+                }
+            }
+        )
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },

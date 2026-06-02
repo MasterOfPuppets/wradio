@@ -47,10 +47,15 @@ object ServiceModule {
             )
             .build()
 
-        val cleanClient = OkHttpClient.Builder().build()
+        // OkHttpClient dedicado para streaming - SEM logging interceptor
+        val streamingClient = OkHttpClient.Builder()
+            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+
         val userAgent = Util.getUserAgent(context, context.getString(R.string.app_name))
 
-        val dataSourceFactory = OkHttpDataSource.Factory(cleanClient)
+        val dataSourceFactory = OkHttpDataSource.Factory(streamingClient)
             .setUserAgent(userAgent)
             .setDefaultRequestProperties(mapOf("Icy-MetaData" to "1"))
 

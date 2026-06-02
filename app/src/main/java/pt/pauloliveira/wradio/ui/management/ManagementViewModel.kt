@@ -9,12 +9,13 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import pt.pauloliveira.wradio.domain.model.Station
 import pt.pauloliveira.wradio.domain.repository.StationRepository
-import java.util.UUID
+import pt.pauloliveira.wradio.service.connection.WRadioPlayerClient
 import javax.inject.Inject
 
 @HiltViewModel
 class ManagementViewModel @Inject constructor(
-    private val repository: StationRepository
+    private val repository: StationRepository,
+    private val playerClient: WRadioPlayerClient
 ) : ViewModel() {
 
     val stations: StateFlow<List<Station>> = repository.getAllStations()
@@ -26,41 +27,47 @@ class ManagementViewModel @Inject constructor(
 
     fun addManualStation(name: String, url: String, logoBlob: ByteArray? = null) {
         viewModelScope.launch {
-            val newStation = Station(
-                uuid = UUID.randomUUID().toString(),
+            repository.createStation(
                 name = name,
                 streamUrl = url,
-                logoBlob = logoBlob,
-                countryCode = null,
-                homepage = null,
-                codec = null,
-                bitrate = 0,
-                clickCount = 0,
-                votes = 0,
-                tags = emptyList(),
-                lastPlayed = null,
-                totalPlayTime = 0,
-                isManuallyAdded = true
+                logoBlob = logoBlob
             )
-            repository.saveStation(newStation)
         }
     }
 
     fun updateStation(station: Station, newName: String, newUrl: String, newLogoBlob: ByteArray? = null) {
         viewModelScope.launch {
-            val updatedStation = station.copy(
+            val currentPlaying = playerClient.playerState.value.station
+            if (currentPlaying?.uuid == station.uuid) {
+                playerClient.stopAndClear()
+            }
+
+            repository.updateStation(
+                uuid = station.uuid,
                 name = newName,
                 streamUrl = newUrl,
-                logoBlob = newLogoBlob,
-                isManuallyAdded = true
+                logoBlob = newLogoBlob ?: station.logoBlob,
+                countryCode = station.countryCode,
+                tags = station.tags
             )
-            repository.saveStation(updatedStation)
+
+            // Após update, reiniciar com dados novos
+            if (currentPlaying?.uuid == station.uuid) {
+                val updatedStation = repository.getStation(station.uuid)
+                if (updatedStation != null) {
+                    playerClient.play(updatedStation)
+                }
+            }
         }
     }
 
     fun deleteStation(station: Station) {
         viewModelScope.launch {
-            repository.deleteStation(station)
+            val currentPlaying = playerClient.playerState.value.station
+            if (currentPlaying?.uuid == station.uuid) {
+                playerClient.stopAndClear()
+            }
+            repository.deleteStation(station.uuid)
         }
     }
 }

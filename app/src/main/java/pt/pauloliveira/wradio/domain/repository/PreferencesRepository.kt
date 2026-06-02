@@ -17,4 +17,8 @@ interface PreferencesRepository {
     suspend fun setBluetoothAutoPause(enabled: Boolean)
 
     suspend fun resetToDefaults()
+
+    suspend fun setResetPending(pending: Boolean)
+
+    fun isResetPending(): Flow<Boolean>
 }

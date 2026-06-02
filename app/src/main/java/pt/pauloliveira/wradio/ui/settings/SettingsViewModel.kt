@@ -1,8 +1,11 @@
 package pt.pauloliveira.wradio.ui.settings
 
+import android.app.backup.BackupManager
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +20,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val stationRepository: StationRepository,
     private val preferencesRepository: PreferencesRepository,
     private val sourceConfigRepository: SourceConfigRepository,
@@ -64,6 +68,9 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             stationRepository.deleteAllStations()
             preferencesRepository.resetToDefaults()
+            // Set flag AFTER clearing preferences so it persists
+            preferencesRepository.setResetPending(true)
+            BackupManager.dataChanged(context.packageName)
         }
     }
 

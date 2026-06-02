@@ -1,7 +1,6 @@
 package pt.pauloliveira.wradio.data.local.dao
 
 import androidx.room.Dao
-import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -26,11 +25,40 @@ interface StationDao {
     @Query("SELECT logoBlob FROM stations WHERE uuid = :uuid")
     suspend fun getLogoBlob(uuid: String): ByteArray?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertStation(station: StationEntity)
+    // CREATE: nova estação — falha se UUID já existe
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun createStation(station: StationEntity)
 
-    @Delete
-    suspend fun deleteStation(station: StationEntity)
+    // CREATE SAMPLE: estação default — ignora se UUID já existe (preserva stats)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun createSampleStation(station: StationEntity)
+
+    // UPDATE: só campos editáveis (nome, url, logo, country, tags)
+    @Query("""
+        UPDATE stations SET 
+            name = :name, 
+            streamUrl = :streamUrl, 
+            logoBlob = :logoBlob, 
+            countryCode = :countryCode, 
+            tags = :tags 
+        WHERE uuid = :uuid
+    """)
+    suspend fun updateStation(
+        uuid: String,
+        name: String,
+        streamUrl: String,
+        logoBlob: ByteArray?,
+        countryCode: String?,
+        tags: String
+    )
+
+    // UPDATE STATS: só campos de estatísticas
+    @Query("UPDATE stations SET lastPlayed = :lastPlayed, totalPlayTime = :totalPlayTime WHERE uuid = :uuid")
+    suspend fun updateStats(uuid: String, lastPlayed: Long?, totalPlayTime: Long)
+
+    // DELETE por UUID
+    @Query("DELETE FROM stations WHERE uuid = :uuid")
+    suspend fun deleteStation(uuid: String)
 
     @Query("DELETE FROM stations")
     suspend fun deleteAllStations()

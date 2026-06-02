@@ -27,6 +27,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -58,7 +59,10 @@ fun HomeScreen(
         )
 
         if (stations.isEmpty()) {
-            HomeEmptyState(modifier = Modifier.weight(1f))
+            HomeEmptyState(
+                modifier = Modifier.weight(1f),
+                onAddSamples = { viewModel.addSampleStations() }
+            )
         } else {
             StationList(
                 modifier = Modifier.weight(1f),
@@ -121,7 +125,10 @@ fun HomeHeader(
 }
 
 @Composable
-fun HomeEmptyState(modifier: Modifier = Modifier) {
+fun HomeEmptyState(
+    modifier: Modifier = Modifier,
+    onAddSamples: () -> Unit
+) {
     Box(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -144,6 +151,12 @@ fun HomeEmptyState(modifier: Modifier = Modifier) {
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            OutlinedButton(onClick = onAddSamples) {
+                Text(text = stringResource(R.string.action_add_sample_stations))
+            }
         }
     }
 }

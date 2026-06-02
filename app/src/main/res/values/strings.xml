@@ -30,6 +30,7 @@
     <string name="home_title">My Radio</string>
     <string name="home_empty_title">No stations found</string>
     <string name="home_empty_message">Get new web radios in the \"Explore\" section\nor insert your own in the \"Manage\" section.</string>
+    <string name="action_add_sample_stations">Add sample stations</string>
     <string name="cd_sort_field_name">Sort by name</string>
     <string name="cd_sort_field_total_play_time">Sort by total play time</string>
     <string name="cd_sort_direction_asc">Ascending order</string>
@@ -89,6 +90,12 @@
     <string name="dialog_clear_title">Factory Reset</string>
     <string name="dialog_clear_message">This action cannot be undone. All your stations and settings will be permanently deleted.</string>
     <string name="action_delete_all">Reset App</string>
+
+    <!-- Backup Restore Dialog -->
+    <string name="dialog_backup_title">Backup Found</string>
+    <string name="dialog_backup_message">Previous station data was restored from a backup. Would you like to keep it or start fresh?</string>
+    <string name="action_restore">Restore</string>
+    <string name="action_start_fresh">Start Fresh</string>
 
     <!-- Error messages -->
     <string name="error_invalid_url">Invalid URL)</string>

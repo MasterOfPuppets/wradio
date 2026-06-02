@@ -19,6 +19,7 @@ class PreferencesRepositoryImpl @Inject constructor(
         val BUFFER_SECONDS_KEY = intPreferencesKey("buffer_seconds")
         val DUCK_LEVEL_KEY = floatPreferencesKey("duck_level")
         val BLUETOOTH_AUTO_PAUSE_KEY = booleanPreferencesKey("bluetooth_auto_pause")
+        val RESET_PENDING_KEY = booleanPreferencesKey("reset_pending")
         const val DEFAULT_BUFFER_SECONDS = 30
         const val DEFAULT_DUCK_LEVEL = 0.1f
         const val DEFAULT_BLUETOOTH_AUTO_PAUSE = true
@@ -63,6 +64,18 @@ class PreferencesRepositoryImpl @Inject constructor(
     override suspend fun resetToDefaults() {
         dataStore.edit { preferences ->
             preferences.clear()
+        }
+    }
+
+    override suspend fun setResetPending(pending: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[RESET_PENDING_KEY] = pending
+        }
+    }
+
+    override fun isResetPending(): Flow<Boolean> {
+        return dataStore.data.map { preferences ->
+            preferences[RESET_PENDING_KEY] ?: false
         }
     }
 }

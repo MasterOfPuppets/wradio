@@ -2,7 +2,9 @@ package pt.pauloliveira.wradio.service.connection
 
 import android.content.ComponentName
 import android.content.Context
+import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import androidx.concurrent.futures.await
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -28,6 +30,7 @@ class WRadioPlayerClient @Inject constructor(
 
     companion object {
         const val EXTRA_STATION_UUID = "pt.pauloliveira.wradio.STATION_UUID"
+        const val EXTRA_PREVIEW = "pt.pauloliveira.wradio.PREVIEW"
         private const val TAG = "WRadioPlayerClient"
     }
 
@@ -50,6 +53,7 @@ class WRadioPlayerClient @Inject constructor(
         }
 
         override fun onPlayerError(error: PlaybackException) {
+            Log.e(TAG, "Player error: ${error.errorCodeName} - ${error.message}")
             val friendlyMessage = getUserFriendlyErrorMessage(error)
             _playerState.update {
                 it.copy(
@@ -148,7 +152,7 @@ class WRadioPlayerClient @Inject constructor(
         return ctrl
     }
 
-    suspend fun play(stations: List<Station>, startIndex: Int = 0) {
+    suspend fun play(stations: List<Station>, startIndex: Int = 0, preview: Boolean = false) {
         val ctrl = getController()
 
         currentPlaylist = stations
@@ -163,7 +167,7 @@ class WRadioPlayerClient @Inject constructor(
             }
         }
         val mediaItems = stations.map { station ->
-            createMediaItem(station)
+            createMediaItem(station, preview)
         }
 
         ctrl.setMediaItems(mediaItems, startIndex, 0L)
@@ -171,8 +175,8 @@ class WRadioPlayerClient @Inject constructor(
         ctrl.play()
     }
 
-    suspend fun play(station: Station) {
-        play(listOf(station), 0)
+    suspend fun play(station: Station, preview: Boolean = false) {
+        play(listOf(station), 0, preview)
     }
 
     suspend fun resume() {
@@ -188,7 +192,14 @@ class WRadioPlayerClient @Inject constructor(
         _playerState.update { it.copy(isPlaying = false, isBuffering = false) }
     }
 
-    private fun createMediaItem(station: Station): MediaItem {
+    /** Para o player e limpa o state (card desaparece). Usar em DELETE/IMPORT. */
+    suspend fun stopAndClear() {
+        getController().stop()
+        currentPlaylist = emptyList()
+        _playerState.update { PlayerState() }
+    }
+
+    private fun createMediaItem(station: Station, preview: Boolean = false): MediaItem {
         var cleanUrl = station.streamUrl
         if (cleanUrl.startsWith("icy://") || cleanUrl.startsWith("icyx://")) {
             cleanUrl = cleanUrl.replace("icy://", "http://")
@@ -197,10 +208,17 @@ class WRadioPlayerClient @Inject constructor(
 
         val extras = Bundle().apply {
             putString(EXTRA_STATION_UUID, station.uuid)
+            putBoolean(EXTRA_PREVIEW, preview)
         }
 
         return MediaItem.Builder()
+            .setMediaId(station.uuid)
             .setUri(cleanUrl)
+            .setRequestMetadata(
+                MediaItem.RequestMetadata.Builder()
+                    .setMediaUri(Uri.parse(cleanUrl))
+                    .build()
+            )
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle(station.name)
@@ -210,12 +228,4 @@ class WRadioPlayerClient @Inject constructor(
             .build()
     }
 
-    suspend fun updatePlaylistContext(stations: List<Station>, currentStationUuid: String) {
-        val newIndex = stations.indexOfFirst { it.uuid == currentStationUuid }
-        if (newIndex == -1) return
-        val ctrl = getController()
-        currentPlaylist = stations
-        val mediaItems = stations.map { createMediaItem(it) }
-        ctrl.setMediaItems(mediaItems, newIndex, ctrl.currentPosition)
-    }
 }

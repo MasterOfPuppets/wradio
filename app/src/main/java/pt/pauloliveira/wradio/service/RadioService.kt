@@ -10,7 +10,7 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
-import android.net.Uri
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -33,10 +33,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.supervisorScope
-import pt.pauloliveira.wradio.data.remote.source.UnifiedSearchDataSource
 import pt.pauloliveira.wradio.domain.repository.PreferencesRepository
-import pt.pauloliveira.wradio.domain.repository.SourceConfigRepository
 import pt.pauloliveira.wradio.domain.repository.StationRepository
 import pt.pauloliveira.wradio.service.connection.WRadioPlayerClient
 import javax.inject.Inject
@@ -46,9 +43,9 @@ import kotlin.math.round
 class RadioService : MediaLibraryService() {
 
     companion object {
+        private const val TAG = "RadioService"
         private const val MEDIA_ROOT_ID = "wradio_root"
         private const val MEDIA_MY_RADIOS_ID = "wradio_my_radios"
-        private const val MEDIA_SEARCH_RESULTS_ID = "wradio_search_results"
     }
 
     @Inject
@@ -57,10 +54,6 @@ class RadioService : MediaLibraryService() {
     lateinit var repository: StationRepository
     @Inject
     lateinit var preferencesRepository: PreferencesRepository
-    @Inject
-    lateinit var unifiedSearchDataSource: UnifiedSearchDataSource
-    @Inject
-    lateinit var sourceConfigRepository: SourceConfigRepository
 
     private var mediaLibrarySession: MediaLibrarySession? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -160,18 +153,6 @@ class RadioService : MediaLibraryService() {
 
     private val librarySessionCallback = object : MediaLibrarySession.Callback {
 
-        private var lastSearchResults = mutableListOf<pt.pauloliveira.wradio.domain.model.Station>()
-
-        override fun onConnect(
-            session: MediaSession,
-            controller: MediaSession.ControllerInfo
-        ): MediaSession.ConnectionResult {
-            val availableSessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
-            return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
-                .setAvailableSessionCommands(availableSessionCommands)
-                .build()
-        }
-
         override fun onGetLibraryRoot(
             session: MediaLibrarySession,
             browser: MediaSession.ControllerInfo,
@@ -220,16 +201,10 @@ class RadioService : MediaLibraryService() {
                     val stations = runBlocking {
                         repository.getAllStations().first()
                     }
-                    val mediaItems = stations.map { station ->
+                    // Mesma ordenação default que a app: totalPlayTime DESC
+                    val sorted = stations.sortedByDescending { it.totalPlayTime }
+                    val mediaItems = sorted.map { station ->
                         buildBrowsableMediaItem(station)
-                    }
-                    Futures.immediateFuture(
-                        LibraryResult.ofItemList(ImmutableList.copyOf(mediaItems), params)
-                    )
-                }
-                MEDIA_SEARCH_RESULTS_ID -> {
-                    val mediaItems = lastSearchResults.map { station ->
-                        buildPlayableMediaItem(station)
                     }
                     Futures.immediateFuture(
                         LibraryResult.ofItemList(ImmutableList.copyOf(mediaItems), params)
@@ -268,90 +243,31 @@ class RadioService : MediaLibraryService() {
             controller: MediaSession.ControllerInfo,
             mediaItems: MutableList<MediaItem>
         ): ListenableFuture<MutableList<MediaItem>> {
+            // Items com URI passam directamente (vindos da app)
+            val needsResolution = mediaItems.any { it.localConfiguration?.uri == null && it.requestMetadata.mediaUri == null }
+
+            if (!needsResolution) {
+                return Futures.immediateFuture(mediaItems)
+            }
+
+            // Resolver items sem URI (Android Auto envia só mediaId)
             val stations = runBlocking {
                 repository.getAllStations().first()
             }
-            val resolvedItems = mediaItems.flatMap { requestedItem ->
-                // Voice search: Assistant sends a MediaItem with searchQuery in extras
-                val searchQuery = requestedItem.requestMetadata.searchQuery
-
-                if (!searchQuery.isNullOrBlank()) {
-                    // Find best match in My Radios by name
-                    val match = stations.firstOrNull { station ->
-                        station.name.contains(searchQuery, ignoreCase = true)
-                    }
-                    if (match != null) {
-                        // Build full playlist starting from matched station
-                        val startIndex = stations.indexOf(match)
-                        val reordered = stations.subList(startIndex, stations.size) +
-                                stations.subList(0, startIndex)
-                        reordered.map { buildPlayableMediaItem(it) }
-                    } else {
-                        listOf(requestedItem)
-                    }
+            val resolvedItems = mediaItems.map { requestedItem ->
+                if (requestedItem.localConfiguration?.uri != null || requestedItem.requestMetadata.mediaUri != null) {
+                    requestedItem
                 } else {
-                    // Direct selection by UUID (browse)
                     val station = stations.find { it.uuid == requestedItem.mediaId }
                     if (station != null) {
-                        // Build full playlist starting from selected station
-                        val startIndex = stations.indexOf(station)
-                        val reordered = stations.subList(startIndex, stations.size) +
-                                stations.subList(0, startIndex)
-                        reordered.map { buildPlayableMediaItem(it) }
+                        buildPlayableMediaItem(station)
                     } else {
-                        listOf(requestedItem)
+                        Log.w(TAG, "onAddMediaItems: station not found for mediaId=${requestedItem.mediaId}")
+                        requestedItem
                     }
                 }
             }.toMutableList()
             return Futures.immediateFuture(resolvedItems)
-        }
-
-        override fun onSearch(
-            session: MediaLibrarySession,
-            browser: MediaSession.ControllerInfo,
-            query: String,
-            params: LibraryParams?
-        ): ListenableFuture<LibraryResult<Void>> {
-            try {
-                // Search both local (My Radios) and remote (Radio Browser) in background
-                serviceScope.launch {
-                    try {
-                        // Get local stations
-                        val localStations = repository.getAllStations().first()
-                        val remoteResults = unifiedSearchDataSource.search(query)
-
-                        // Filter local results by query (case-insensitive search in name and tags)
-                        val localMatches = localStations.filter { station ->
-                            station.name.contains(query, ignoreCase = true) ||
-                                    station.tags.any { it.contains(query, ignoreCase = true) }
-                        }
-
-                        // Combine local and remote results, avoiding duplicates (by UUID)
-                        val seenUuids = mutableSetOf<String>()
-                        lastSearchResults.clear()
-
-                        // Add local matches first
-                        localMatches.forEach { station ->
-                            if (seenUuids.add(station.uuid)) {
-                                lastSearchResults.add(station)
-                            }
-                        }
-
-                        // Add remote results (deduped)
-                        remoteResults.forEach { result ->
-                            if (seenUuids.add(result.station.uuid)) {
-                                lastSearchResults.add(result.station)
-                            }
-                        }
-                    } catch (e: Exception) {
-                        // Log error silently
-                    }
-                }
-
-                return Futures.immediateFuture(LibraryResult.ofVoid(params))
-            } catch (e: Exception) {
-                return Futures.immediateFuture(LibraryResult.ofError(SessionError.ERROR_BAD_VALUE))
-            }
         }
     }
 
@@ -462,6 +378,12 @@ class RadioService : MediaLibraryService() {
     }
 
     private fun startSession(mediaItem: MediaItem?) {
+        val isPreview = mediaItem?.mediaMetadata?.extras?.getBoolean(WRadioPlayerClient.EXTRA_PREVIEW, false) ?: false
+        if (isPreview) {
+            sessionStartTime = 0
+            currentPlayingUuid = null
+            return
+        }
         sessionStartTime = System.currentTimeMillis()
         currentPlayingUuid = mediaItem?.mediaMetadata?.extras?.getString(WRadioPlayerClient.EXTRA_STATION_UUID)
     }
@@ -488,11 +410,11 @@ class RadioService : MediaLibraryService() {
         serviceScope.launch {
             val station = repository.getStation(uuid)
             if (station != null) {
-                val updatedStation = station.copy(
-                    totalPlayTime = station.totalPlayTime + minutesToAdd,
-                    lastPlayed = System.currentTimeMillis()
+                repository.updateStats(
+                    uuid = uuid,
+                    lastPlayed = System.currentTimeMillis(),
+                    totalPlayTime = station.totalPlayTime + minutesToAdd
                 )
-                repository.saveStation(updatedStation)
             }
         }
     }
