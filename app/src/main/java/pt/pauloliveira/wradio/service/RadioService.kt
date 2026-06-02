@@ -1,6 +1,5 @@
 package pt.pauloliveira.wradio.service
 
-import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -65,13 +64,14 @@ class RadioService : MediaLibraryService() {
     private var audioFocusRequest: AudioFocusRequest? = null
     private var wasPlayingBeforeFocusLoss = false
 
-    // Bluetooth receiver
-    private val bluetoothReceiver = object : BroadcastReceiver() {
+    // Audio becoming noisy receiver (BT disconnected, headphones unplugged)
+    private val noisyReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == BluetoothDevice.ACTION_ACL_DISCONNECTED) {
+            if (intent.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
                 val shouldAutoPause = runBlocking {
                     preferencesRepository.getBluetoothAutoPause().first()
                 }
+                Log.d(TAG, "Audio becoming noisy: shouldAutoPause=$shouldAutoPause, isPlaying=${player.isPlaying}")
                 if (shouldAutoPause && player.isPlaying) {
                     player.stop()
                 }
@@ -338,7 +338,7 @@ class RadioService : MediaLibraryService() {
 
     override fun onDestroy() {
         abandonAudioFocus()
-        unregisterReceiver(bluetoothReceiver)
+        unregisterReceiver(noisyReceiver)
         mediaLibrarySession?.run {
             player.removeListener(playerListener)
             player.release()
@@ -368,13 +368,14 @@ class RadioService : MediaLibraryService() {
     }
 
     private fun registerBluetoothReceiver() {
-        val filter = IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+        val filter = IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(bluetoothReceiver, filter, Context.RECEIVER_EXPORTED)
+            registerReceiver(noisyReceiver, filter, Context.RECEIVER_EXPORTED)
         } else {
             @Suppress("UnspecifiedRegisterReceiverFlag")
-            registerReceiver(bluetoothReceiver, filter)
+            registerReceiver(noisyReceiver, filter)
         }
+        Log.d(TAG, "Noisy receiver registered")
     }
 
     private fun startSession(mediaItem: MediaItem?) {
