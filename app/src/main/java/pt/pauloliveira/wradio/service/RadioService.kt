@@ -249,24 +249,22 @@ class RadioService : MediaLibraryService() {
                 return Futures.immediateFuture(mediaItems)
             }
 
-            // Resolver items sem URI (Android Auto envia só mediaId)
+            // Android Auto envia só mediaId — construir playlist completa para next/prev
             val stations = runBlocking {
                 repository.getAllStations().first()
             }
-            val resolvedItems = mediaItems.map { requestedItem ->
-                if (requestedItem.localConfiguration?.uri != null || requestedItem.requestMetadata.mediaUri != null) {
-                    requestedItem
-                } else {
-                    val station = stations.find { it.uuid == requestedItem.mediaId }
-                    if (station != null) {
-                        buildPlayableMediaItem(station)
-                    } else {
-                        Log.w(TAG, "onAddMediaItems: station not found for mediaId=${requestedItem.mediaId}")
-                        requestedItem
-                    }
-                }
-            }.toMutableList()
-            return Futures.immediateFuture(resolvedItems)
+            val sorted = stations.sortedByDescending { it.totalPlayTime }
+            val requestedId = mediaItems.firstOrNull()?.mediaId
+            val fullPlaylist = sorted.map { buildPlayableMediaItem(it) }.toMutableList()
+
+            // Reordenar para começar na estação pedida
+            val startIndex = fullPlaylist.indexOfFirst { it.mediaId == requestedId }
+            if (startIndex > 0) {
+                val reordered = (fullPlaylist.subList(startIndex, fullPlaylist.size) +
+                    fullPlaylist.subList(0, startIndex)).toMutableList()
+                return Futures.immediateFuture(reordered)
+            }
+            return Futures.immediateFuture(fullPlaylist)
         }
     }
 
