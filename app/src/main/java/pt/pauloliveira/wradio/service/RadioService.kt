@@ -71,7 +71,6 @@ class RadioService : MediaLibraryService() {
                 val shouldAutoPause = runBlocking {
                     preferencesRepository.getBluetoothAutoPause().first()
                 }
-                Log.d(TAG, "Audio becoming noisy: shouldAutoPause=$shouldAutoPause, isPlaying=${player.isPlaying}")
                 if (shouldAutoPause && player.isPlaying) {
                     player.stop()
                 }
@@ -375,7 +374,6 @@ class RadioService : MediaLibraryService() {
             @Suppress("UnspecifiedRegisterReceiverFlag")
             registerReceiver(noisyReceiver, filter)
         }
-        Log.d(TAG, "Noisy receiver registered")
     }
 
     private fun startSession(mediaItem: MediaItem?) {

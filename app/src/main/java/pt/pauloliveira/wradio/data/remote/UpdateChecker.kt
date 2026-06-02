@@ -29,6 +29,8 @@ class UpdateChecker @Inject constructor(
             val request = Request.Builder()
                 .url(RELEASES_URL)
                 .header("Accept", "application/vnd.github.v3+json")
+                .header("Cache-Control", "no-cache, no-store, must-revalidate")
+                .header("Pragma", "no-cache")
                 .build()
 
             val response = okHttpClient.newCall(request).execute()

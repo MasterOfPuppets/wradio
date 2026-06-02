@@ -7,7 +7,15 @@
 - [x] Multi-directory search infrastructure (Radio Browser)
 - [x] Source label mechanism (hidden while single provider)
 - [x] APK auto-naming (wradio-{version}.apk)
-- [x] Android Auto search implementation with local + remote results (v1.5)
+- [x] Android Auto search implementation with local + remote results (v1.4)
+- [x] Fix playback architecture — onAddMediaItems 1:1 map, dedicated streaming OkHttpClient (v1.5)
+- [x] Separate CRUD — create/update/updateStats/delete with validation (v1.5)
+- [x] Preview without playtime tracking (v1.5)
+- [x] Player stops on DELETE/IMPORT/RESET (v1.5)
+- [x] Android Auto ordering matches app (totalPlayTime DESC) (v1.5)
+- [x] Bluetooth pause via ACTION_AUDIO_BECOMING_NOISY (v1.5)
+- [x] Remove addSampleStations (v1.5)
+- [x] Unit tests for Repository CRUD and ManagementViewModel (v1.5)
 
 ## Pending / Ideas
 
@@ -23,3 +31,4 @@
 - Source label mechanism (RB/SC/IC) exists in code but is hidden when only one provider returns results. Will show automatically when a second provider is active.
 - Favourites concept is already covered by "sort by totalPlayTime desc" — most listened = favourites.
 - Update checker currently works with `v1.4`-style tags and GitHub's `latest` release, but future hardening should fetch/compare releases by highest semantic version so release ordering quirks do not affect update detection.
+- v1.5 was a major stability release fixing bugs introduced in v1.4 (Android Auto). Architecture was redesigned with clear separation of concerns.
