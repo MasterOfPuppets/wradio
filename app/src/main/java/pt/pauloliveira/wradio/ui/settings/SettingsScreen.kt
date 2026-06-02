@@ -1,6 +1,9 @@
 package pt.pauloliveira.wradio.ui.settings
 
 import android.content.Intent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,8 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Description
@@ -21,7 +26,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.VolumeDown
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -29,6 +33,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -36,6 +41,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -50,6 +56,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -68,10 +75,67 @@ fun SettingsScreen(
     val bluetoothAutoPause by viewModel.bluetoothAutoPause.collectAsState()
     val sourcesRefreshState by viewModel.sourcesRefreshState.collectAsState()
     val updateState by viewModel.updateState.collectAsState()
+    val exportImportState by viewModel.exportImportState.collectAsState()
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showBufferDialog by remember { mutableStateOf(false) }
     var showDuckDialog by remember { mutableStateOf(false) }
+    var showExportDialog by remember { mutableStateOf(false) }
+    var exportListName by rememberSaveable { mutableStateOf(viewModel.generateExportName()) }
+
+    val createDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) {
+            val name = exportListName.trim().ifBlank { viewModel.generateExportName() }
+            viewModel.exportStations(uri, name)
+        }
+    }
+
+    val importDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.importStations(uri)
+        }
+    }
+
+    LaunchedEffect(exportImportState) {
+        when (val state = exportImportState) {
+            is ExportImportState.ExportSuccess -> {
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.msg_export_success, state.count),
+                    Toast.LENGTH_LONG
+                ).show()
+                viewModel.clearExportImportState()
+            }
+
+            is ExportImportState.ImportSuccess -> {
+                Toast.makeText(
+                    context,
+                    context.getString(
+                        R.string.msg_import_success,
+                        state.result.added,
+                        state.result.skipped
+                    ),
+                    Toast.LENGTH_LONG
+                ).show()
+                viewModel.clearExportImportState()
+            }
+
+            is ExportImportState.Error -> {
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.msg_export_error, state.message),
+                    Toast.LENGTH_LONG
+                ).show()
+                viewModel.clearExportImportState()
+            }
+
+            ExportImportState.Idle -> Unit
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -97,7 +161,7 @@ fun SettingsScreen(
                 color = MaterialTheme.colorScheme.outlineVariant
             )
             SettingsItem(
-                icon = Icons.Default.VolumeDown,
+                icon = Icons.AutoMirrored.Filled.VolumeDown,
                 title = stringResource(R.string.settings_duck_level),
                 subtitle = stringResource(R.string.settings_duck_level_value, (duckLevel * 100).toInt()),
                 onClick = { showDuckDialog = true }
@@ -130,7 +194,7 @@ fun SettingsScreen(
                 subtitle = when (updateState) {
                     is UpdateState.Checking -> "$appVersion (${stringResource(R.string.settings_update_checking)})"
                     is UpdateState.UpToDate -> "$appVersion (${stringResource(R.string.settings_update_up_to_date)})"
-                    is UpdateState.Available -> "$appVersion → ${(updateState as UpdateState.Available).update.latestVersion}"
+                    is UpdateState.Available -> "$appVersion  ${(updateState as UpdateState.Available).update.latestVersion}"
                     else -> appVersion
                 },
                 onClick = {
@@ -139,7 +203,8 @@ fun SettingsScreen(
                         try {
                             val intent = Intent(Intent.ACTION_VIEW, state.update.downloadUrl.toUri())
                             context.startActivity(intent)
-                        } catch (_: Exception) { }
+                        } catch (_: Exception) {
+                        }
                     } else {
                         viewModel.checkForUpdate()
                     }
@@ -156,7 +221,8 @@ fun SettingsScreen(
                             try {
                                 val intent = Intent(Intent.ACTION_VIEW, state.update.downloadUrl.toUri())
                                 context.startActivity(intent)
-                            } catch (_: Exception) { }
+                            } catch (_: Exception) {
+                            }
                         }
                     }
                 )
@@ -196,6 +262,29 @@ fun SettingsScreen(
 
         SettingsGroup(title = stringResource(R.string.settings_group_data)) {
             SettingsItem(
+                icon = Icons.Default.Description,
+                title = stringResource(R.string.settings_export_list),
+                subtitle = stringResource(R.string.settings_export_list_desc),
+                onClick = {
+                    exportListName = viewModel.generateExportName()
+                    showExportDialog = true
+                }
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+            SettingsItem(
+                icon = Icons.Default.Refresh,
+                title = stringResource(R.string.settings_import_list),
+                subtitle = stringResource(R.string.settings_import_list_desc),
+                onClick = { importDocumentLauncher.launch(arrayOf("application/json", "text/json", "*/*")) }
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+            SettingsItem(
                 icon = Icons.Default.DeleteForever,
                 title = stringResource(R.string.settings_clear_data),
                 subtitle = stringResource(R.string.settings_clear_data_desc),
@@ -203,6 +292,40 @@ fun SettingsScreen(
                 onClick = { showDeleteDialog = true }
             )
         }
+    }
+
+    if (showExportDialog) {
+        AlertDialog(
+            onDismissRequest = { showExportDialog = false },
+            title = { Text(stringResource(R.string.dialog_export_title)) },
+            text = {
+                OutlinedTextField(
+                    value = exportListName,
+                    onValueChange = { exportListName = it },
+                    label = { Text(stringResource(R.string.dialog_export_name_label)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Words
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showExportDialog = false
+                        createDocumentLauncher.launch(buildExportFileName(exportListName))
+                    }
+                ) {
+                    Text(stringResource(R.string.action_export))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExportDialog = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
     }
 
     if (showBufferDialog) {
@@ -254,13 +377,19 @@ fun SettingsScreen(
     }
 }
 
+private fun buildExportFileName(name: String): String {
+    val sanitized = name.trim()
+        .ifBlank { "wradio-stations" }
+        .replace(Regex("[\\\\/:*?\"<>|]"), "_")
+    return if (sanitized.lowercase().endsWith(".json")) sanitized else "$sanitized.json"
+}
+
 @Composable
 fun DuckLevelDialog(
     currentValue: Float,
     onDismiss: () -> Unit,
     onSelected: (Float) -> Unit
 ) {
-    val scope = rememberCoroutineScope()
     var sliderValue by rememberSaveable { mutableStateOf(currentValue) }
 
     AlertDialog(

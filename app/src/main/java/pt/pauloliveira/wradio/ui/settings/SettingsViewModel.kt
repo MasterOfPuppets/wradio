@@ -2,6 +2,7 @@ package pt.pauloliveira.wradio.ui.settings
 
 import android.app.backup.BackupManager
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -11,6 +12,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import pt.pauloliveira.wradio.data.export.ImportResult
+import pt.pauloliveira.wradio.data.export.StationExportManager
 import pt.pauloliveira.wradio.data.remote.AppUpdate
 import pt.pauloliveira.wradio.data.remote.UpdateChecker
 import pt.pauloliveira.wradio.domain.repository.PreferencesRepository
@@ -26,7 +29,8 @@ class SettingsViewModel @Inject constructor(
     private val preferencesRepository: PreferencesRepository,
     private val sourceConfigRepository: SourceConfigRepository,
     private val updateChecker: UpdateChecker,
-    private val playerClient: WRadioPlayerClient
+    private val playerClient: WRadioPlayerClient,
+    val exportManager: StationExportManager
 ) : ViewModel() {
 
     val bufferSize: StateFlow<Int> = preferencesRepository.getBufferSeconds()
@@ -110,6 +114,38 @@ class SettingsViewModel @Inject constructor(
             }
         }
     }
+
+    // Export/Import
+    private val _exportImportState = MutableStateFlow<ExportImportState>(ExportImportState.Idle)
+    val exportImportState: StateFlow<ExportImportState> = _exportImportState
+
+    fun generateExportName(): String = exportManager.generateDefaultName()
+
+    fun exportStations(uri: Uri, listName: String?) {
+        viewModelScope.launch {
+            try {
+                val count = exportManager.exportToUri(uri, listName)
+                _exportImportState.value = ExportImportState.ExportSuccess(count)
+            } catch (e: Exception) {
+                _exportImportState.value = ExportImportState.Error(e.message ?: "Export failed")
+            }
+        }
+    }
+
+    fun importStations(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val result = exportManager.importFromUri(uri)
+                _exportImportState.value = ExportImportState.ImportSuccess(result)
+            } catch (e: Exception) {
+                _exportImportState.value = ExportImportState.Error(e.message ?: "Import failed")
+            }
+        }
+    }
+
+    fun clearExportImportState() {
+        _exportImportState.value = ExportImportState.Idle
+    }
 }
 
 sealed interface SourcesRefreshState {
@@ -124,4 +160,11 @@ sealed interface UpdateState {
     data object Checking : UpdateState
     data object UpToDate : UpdateState
     data class Available(val update: AppUpdate) : UpdateState
+}
+
+sealed interface ExportImportState {
+    data object Idle : ExportImportState
+    data class ExportSuccess(val count: Int) : ExportImportState
+    data class ImportSuccess(val result: ImportResult) : ExportImportState
+    data class Error(val message: String) : ExportImportState
 }

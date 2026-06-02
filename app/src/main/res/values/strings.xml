@@ -67,6 +67,10 @@
     <string name="settings_group_data">Data &amp; Storage</string>
     <string name="settings_clear_data">Factory Reset</string>
     <string name="settings_clear_data_desc">Delete all stations and reset settings</string>
+    <string name="settings_export_list">Export List</string>
+    <string name="settings_export_list_desc">Save your stations to a file</string>
+    <string name="settings_import_list">Import List</string>
+    <string name="settings_import_list_desc">Load stations from a file (skips duplicates)</string>
     <string name="settings_group_playback">Playback</string>
     <string name="settings_buffer_size">Buffer Size</string>
     <string name="settings_buffer_desc">Higher values help on unstable networks. Requires restart.</string>
@@ -90,6 +94,14 @@
     <string name="dialog_clear_title">Factory Reset</string>
     <string name="dialog_clear_message">This action cannot be undone. All your stations and settings will be permanently deleted.</string>
     <string name="action_delete_all">Reset App</string>
+
+    <!-- Export Dialog -->
+    <string name="dialog_export_title">Export List</string>
+    <string name="dialog_export_name_label">List name</string>
+    <string name="action_export">Export</string>
+    <string name="msg_export_success">Exported %d stations</string>
+    <string name="msg_import_success">Added %1$d stations, %2$d skipped (duplicates)</string>
+    <string name="msg_export_error">Error: %s</string>
 
     <!-- Backup Restore Dialog -->
     <string name="dialog_backup_title">Backup Found</string>
