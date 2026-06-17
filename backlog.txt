@@ -16,6 +16,8 @@
 - [x] Bluetooth pause via ACTION_AUDIO_BECOMING_NOISY (v1.5)
 - [x] Remove addSampleStations (v1.5)
 - [x] Unit tests for Repository CRUD and ManagementViewModel (v1.5)
+- [x] Export/Import/Merge "My Radios" station list — JSON backup, file picker, merge by URL (v1.5)
+- [x] Enhanced station logo fallback — gradient placeholder by UUID + favicon download on save to "My Radios" (v1.5)
 - [x] Preferred audio device setting for Android Auto — force BT_RADIO when Bytelink/AA steals audio (v1.6)
 - [x] Buffering watchdog (30s) — auto-retry stale stream after BT reconnect (v1.6)
 - [x] Stale MediaController detection — reconnect instead of silently dropping commands (v1.6)
@@ -23,8 +25,6 @@
 
 ## Pending / Ideas
 
-- [ ] Export/Import/Merge "My Radios" station list (JSON backup, share between devices, merge without losing existing). Consider cloud sync (Google Drive / Dropbox) as alternative or complement to local file.
-- [ ] Enhanced station logo fallback (Option 7: Google S2 favicon lookup + gradient fallback). Only fetch favicon when station is saved to "My Radios" to avoid slowing down search results.
 - [ ] Sleep timer — stop playback after X minutes
 - [ ] Home screen widget — mini-player on Android launcher
 - [ ] Now playing metadata history — show last N tracks in future fullscreen player (TBD if worth it)
