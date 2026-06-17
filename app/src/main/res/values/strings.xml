@@ -79,6 +79,11 @@
     <string name="settings_duck_desc">Volume level when another app (e.g. navigation) needs audio.</string>
     <string name="settings_bt_pause">Pause on Bluetooth Disconnect</string>
     <string name="settings_bt_pause_desc">Stop playback when a Bluetooth device disconnects.</string>
+    <string name="settings_preferred_audio_device">Preferred Audio Device (Android Auto)</string>
+    <string name="settings_preferred_audio_device_desc">Force audio to a specific Bluetooth device when Android Auto is active.</string>
+    <string name="settings_preferred_audio_device_value_default">Default (system decides)</string>
+    <string name="dialog_preferred_device_title">Preferred Audio Device</string>
+    <string name="dialog_preferred_device_note">Only applies when Android Auto is active. Select the device that should receive the audio (e.g. your car radio).</string>
 
     <string name="dialog_buffer_title">Set Buffer Length</string>
     <string name="dialog_duck_title">Set Duck Volume</string>

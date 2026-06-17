@@ -54,6 +54,20 @@ class SettingsViewModel @Inject constructor(
             initialValue = true
         )
 
+    val preferredAudioDeviceName: StateFlow<String> = preferencesRepository.getPreferredAudioDeviceName()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = ""
+        )
+
+    val knownBluetoothDevices: StateFlow<Set<String>> = preferencesRepository.getKnownBluetoothDevices()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptySet()
+        )
+
     suspend fun saveBufferSize(seconds: Int) {
         preferencesRepository.setBufferSeconds(seconds)
     }
@@ -70,6 +84,12 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun savePreferredAudioDeviceName(name: String) {
+        viewModelScope.launch {
+            preferencesRepository.setPreferredAudioDeviceName(name)
+        }
+    }
+
     fun clearAllData() {
         viewModelScope.launch {
             playerClient.stopAndClear()
@@ -83,6 +103,7 @@ class SettingsViewModel @Inject constructor(
 
     private val _sourcesRefreshState = MutableStateFlow<SourcesRefreshState>(SourcesRefreshState.Idle)
     val sourcesRefreshState: StateFlow<SourcesRefreshState> = _sourcesRefreshState
+
 
     fun refreshSources() {
         viewModelScope.launch {

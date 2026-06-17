@@ -4,6 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -35,6 +37,7 @@ import kotlinx.coroutines.runBlocking
 import pt.pauloliveira.wradio.domain.repository.PreferencesRepository
 import pt.pauloliveira.wradio.domain.repository.StationRepository
 import pt.pauloliveira.wradio.service.connection.WRadioPlayerClient
+import pt.pauloliveira.wradio.service.diagnostics.PlaybackDiagnosticsLogger
 import javax.inject.Inject
 import kotlin.math.round
 
@@ -45,6 +48,7 @@ class RadioService : MediaLibraryService() {
         private const val TAG = "RadioService"
         private const val MEDIA_ROOT_ID = "wradio_root"
         private const val MEDIA_MY_RADIOS_ID = "wradio_my_radios"
+        private const val BT_RECONNECT_REBIND_WINDOW_MS = 90_000L
     }
 
     @Inject
@@ -63,23 +67,138 @@ class RadioService : MediaLibraryService() {
     private lateinit var audioManager: AudioManager
     private var audioFocusRequest: AudioFocusRequest? = null
     private var wasPlayingBeforeFocusLoss = false
+    private var lastNoisyEventAt: Long = 0L
+    private var audioDeviceCallback: AudioDeviceCallback? = null
+    private val diagnostics by lazy { PlaybackDiagnosticsLogger(this) }
 
     // Audio becoming noisy receiver (BT disconnected, headphones unplugged)
     private val noisyReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
+                diagnostics.log(
+                    event = "service.noisy_receiver",
+                    details = mapOf(
+                        "action" to intent.action,
+                        "playerIsPlaying" to player.isPlaying,
+                        "outputs" to describeCurrentOutputs()
+                    )
+                )
+                lastNoisyEventAt = System.currentTimeMillis()
                 val shouldAutoPause = runBlocking {
                     preferencesRepository.getBluetoothAutoPause().first()
                 }
                 if (shouldAutoPause && player.isPlaying) {
+                    diagnostics.log(event = "service.noisy_receiver.stop_player")
                     player.stop()
                 }
             }
         }
     }
 
+    private fun createAudioDeviceCallback(): AudioDeviceCallback {
+        return object : AudioDeviceCallback() {
+            override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) {
+                diagnostics.log(
+                    event = "service.audio_devices_added",
+                    details = mapOf(
+                        "added" to addedDevices.joinToString { describeDevice(it) },
+                        "outputs" to describeCurrentOutputs()
+                    )
+                )
+                val btDevices = addedDevices.filter(::isBluetoothOutputDevice)
+                if (btDevices.isNotEmpty()) {
+                    // Cache newly seen BT device names
+                    btDevices.forEach { device ->
+                        val name = device.productName?.toString()?.ifBlank { null } ?: return@forEach
+                        serviceScope.launch { preferencesRepository.addKnownBluetoothDevice(name) }
+                    }
+                    // Apply preferred device if it just connected
+                    applyPreferredAudioDeviceIfNeeded(btDevices)
+                }
+            }
+
+            override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
+                diagnostics.log(
+                    event = "service.audio_devices_removed",
+                    details = mapOf(
+                        "removed" to removedDevices.joinToString { describeDevice(it) },
+                        "outputs" to describeCurrentOutputs()
+                    )
+                )
+                val preferredName = runBlocking { preferencesRepository.getPreferredAudioDeviceName().first() }
+                if (preferredName.isNotBlank()) {
+                    val wasPreferredRemoved = removedDevices.any {
+                        it.productName?.toString() == preferredName && isBluetoothOutputDevice(it)
+                    }
+                    if (wasPreferredRemoved) {
+                        // Check if preferred device is still connected on another port
+                        val stillConnected = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                            .firstOrNull { it.productName?.toString() == preferredName && isBluetoothOutputDevice(it) }
+                        if (stillConnected != null) {
+                            // Re-apply to the remaining port
+                            (player as? androidx.media3.exoplayer.ExoPlayer)?.setPreferredAudioDevice(stillConnected)
+                            diagnostics.log("service.preferred_device.reapplied", mapOf("device" to preferredName))
+                        } else {
+                            // Device fully disconnected — clear preference
+                            (player as? androidx.media3.exoplayer.ExoPlayer)?.setPreferredAudioDevice(null)
+                            diagnostics.log("service.preferred_device.cleared", mapOf("device" to preferredName))
+                            // Stop player if bluetoothAutoPause is enabled (complement to noisy receiver)
+                            val shouldAutoPause = runBlocking { preferencesRepository.getBluetoothAutoPause().first() }
+                            if (shouldAutoPause && player.isPlaying) {
+                                player.stop()
+                                diagnostics.log("service.preferred_device.stop_on_disconnect")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun applyPreferredAudioDeviceIfNeeded(btDevices: List<AudioDeviceInfo>) {
+        val preferredName = runBlocking { preferencesRepository.getPreferredAudioDeviceName().first() }
+        if (preferredName.isBlank()) return
+        val preferred = btDevices.firstOrNull { it.productName?.toString() == preferredName } ?: return
+        (player as? androidx.media3.exoplayer.ExoPlayer)?.setPreferredAudioDevice(preferred)
+        diagnostics.log("service.preferred_device.applied", mapOf("device" to preferredName))
+    }
+
+    private fun isBluetoothOutputDevice(device: AudioDeviceInfo): Boolean {
+        if (!device.isSink) return false
+        return when (device.type) {
+            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+            AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+            AudioDeviceInfo.TYPE_BLE_HEADSET,
+            AudioDeviceInfo.TYPE_BLE_SPEAKER,
+            AudioDeviceInfo.TYPE_BLE_BROADCAST -> true
+            else -> false
+        }
+    }
+
+    private fun describeCurrentOutputs(): String {
+        return runCatching {
+            audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                .joinToString(separator = ";") { describeDevice(it) }
+        }.getOrElse { "unavailable" }
+    }
+
+
+    private fun describeDevice(device: AudioDeviceInfo): String {
+        val name = device.productName?.toString()?.ifBlank { "unknown" } ?: "unknown"
+        return "${device.type}:$name"
+    }
+
     // Audio focus listener
     private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+        diagnostics.log(
+            event = "service.audio_focus_change",
+            details = mapOf(
+                "focusChange" to focusChange,
+                "isPlaying" to player.isPlaying,
+                "volume" to player.volume,
+                "wasPlayingBeforeFocusLoss" to wasPlayingBeforeFocusLoss
+            )
+        )
         when (focusChange) {
             AudioManager.AUDIOFOCUS_LOSS -> {
                 wasPlayingBeforeFocusLoss = player.isPlaying
@@ -109,6 +228,17 @@ class RadioService : MediaLibraryService() {
     private val playerListener = object : Player.Listener {
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            val activeRouteDesc = if (isPlaying) describeCurrentOutputs() else null
+            diagnostics.log(
+                event = "service.player.on_is_playing_changed",
+                details = buildMap {
+                    put("isPlaying", isPlaying)
+                    put("state", player.playbackState)
+                    put("volume", player.volume)
+                    put("currentMediaId", player.currentMediaItem?.mediaId)
+                    if (activeRouteDesc != null) put("activeRoute", activeRouteDesc)
+                }
+            )
             if (isPlaying) {
                 startSession(player.currentMediaItem)
             } else {
@@ -322,11 +452,17 @@ class RadioService : MediaLibraryService() {
 
     override fun onCreate() {
         super.onCreate()
+        diagnostics.log(event = "service.on_create")
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         mediaLibrarySession = MediaLibrarySession.Builder(this, player, librarySessionCallback).build()
         player.addListener(playerListener)
         requestAudioFocus()
         registerBluetoothReceiver()
+        registerAudioDeviceCallback()
+        diagnostics.log(
+            event = "service.on_create.ready",
+            details = mapOf("logPath" to diagnostics.getAbsolutePath())
+        )
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? {
@@ -334,15 +470,19 @@ class RadioService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        diagnostics.log(event = "service.on_destroy.start")
         abandonAudioFocus()
-        unregisterReceiver(noisyReceiver)
+        runCatching {
+            unregisterReceiver(noisyReceiver)
+        }
+        unregisterAudioDeviceCallback()
         mediaLibrarySession?.run {
-            player.removeListener(playerListener)
-            player.release()
+            shutdownSharedPlayer(player, playerListener)
             release()
             mediaLibrarySession = null
         }
         serviceScope.cancel()
+        diagnostics.log(event = "service.on_destroy.end")
         super.onDestroy()
     }
 
@@ -357,11 +497,21 @@ class RadioService : MediaLibraryService() {
             .setWillPauseWhenDucked(false)
             .setOnAudioFocusChangeListener(audioFocusListener)
             .build()
-        audioManager.requestAudioFocus(audioFocusRequest!!)
+        val result = audioManager.requestAudioFocus(audioFocusRequest!!)
+        diagnostics.log(
+            event = "service.request_audio_focus",
+            details = mapOf("result" to result)
+        )
     }
 
     private fun abandonAudioFocus() {
-        audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+        audioFocusRequest?.let {
+            val result = audioManager.abandonAudioFocusRequest(it)
+            diagnostics.log(
+                event = "service.abandon_audio_focus",
+                details = mapOf("result" to result)
+            )
+        }
     }
 
     private fun registerBluetoothReceiver() {
@@ -374,7 +524,34 @@ class RadioService : MediaLibraryService() {
         }
     }
 
+    private fun registerAudioDeviceCallback() {
+        if (audioDeviceCallback != null) return
+        val callback = createAudioDeviceCallback()
+        audioDeviceCallback = callback
+        audioManager.registerAudioDeviceCallback(callback, null)
+        diagnostics.log(
+            event = "service.audio_device_callback.registered",
+            details = mapOf("outputs" to describeCurrentOutputs())
+        )
+    }
+
+    private fun unregisterAudioDeviceCallback() {
+        val callback = audioDeviceCallback ?: return
+        runCatching {
+            audioManager.unregisterAudioDeviceCallback(callback)
+        }
+        audioDeviceCallback = null
+        diagnostics.log(event = "service.audio_device_callback.unregistered")
+    }
+
     private fun startSession(mediaItem: MediaItem?) {
+        diagnostics.log(
+            event = "service.session.start",
+            details = mapOf(
+                "mediaId" to mediaItem?.mediaId,
+                "isPreview" to (mediaItem?.mediaMetadata?.extras?.getBoolean(WRadioPlayerClient.EXTRA_PREVIEW, false) ?: false)
+            )
+        )
         val isPreview = mediaItem?.mediaMetadata?.extras?.getBoolean(WRadioPlayerClient.EXTRA_PREVIEW, false) ?: false
         if (isPreview) {
             sessionStartTime = 0
@@ -398,6 +575,14 @@ class RadioService : MediaLibraryService() {
         if (durationMs < MIN_LISTEN_THRESHOLD) return
 
         val minutesToAdd = round(durationMs / 60000.0).toLong()
+        diagnostics.log(
+            event = "service.session.end",
+            details = mapOf(
+                "durationMs" to durationMs,
+                "minutesToAdd" to minutesToAdd,
+                "stationUuid" to uuidToUpdate
+            )
+        )
         if (minutesToAdd > 0) {
             updateStationStatistics(uuidToUpdate, minutesToAdd)
         }
@@ -415,4 +600,24 @@ class RadioService : MediaLibraryService() {
             }
         }
     }
+}
+
+/**
+ * Safely shuts down a [Player] that is a **@Singleton** shared across [RadioService] recreations.
+ *
+ * **Why not `player.release()`?**
+ * The ExoPlayer instance lives in the Hilt SingletonComponent — it outlives any individual
+ * RadioService instance. Calling `release()` permanently destroys it; when the service is
+ * recreated (e.g. after car Bluetooth disconnect + reconnect), Hilt re-injects the same
+ * (now broken) instance and all subsequent play() / prepare() calls silently fail,
+ * leaving the UI in an infinite buffering state.
+ *
+ * `stop()` + `clearMediaItems()` returns the player to STATE_IDLE while keeping it usable.
+ *
+ * Extracted as a top-level function so it can be unit-tested without Android framework deps.
+ */
+internal fun shutdownSharedPlayer(player: Player, listener: Player.Listener) {
+    player.removeListener(listener)
+    player.stop()
+    player.clearMediaItems()
 }

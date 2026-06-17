@@ -16,6 +16,14 @@ interface PreferencesRepository {
 
     suspend fun setBluetoothAutoPause(enabled: Boolean)
 
+    fun getPreferredAudioDeviceName(): Flow<String>
+
+    suspend fun setPreferredAudioDeviceName(name: String)
+
+    fun getKnownBluetoothDevices(): Flow<Set<String>>
+
+    suspend fun addKnownBluetoothDevice(name: String)
+
     suspend fun resetToDefaults()
 
     suspend fun setResetPending(pending: Boolean)

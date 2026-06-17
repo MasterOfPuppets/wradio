@@ -73,6 +73,8 @@ fun SettingsScreen(
     val bufferSize by viewModel.bufferSize.collectAsState()
     val duckLevel by viewModel.duckLevel.collectAsState()
     val bluetoothAutoPause by viewModel.bluetoothAutoPause.collectAsState()
+    val preferredAudioDeviceName by viewModel.preferredAudioDeviceName.collectAsState()
+    val knownBluetoothDevices by viewModel.knownBluetoothDevices.collectAsState()
     val sourcesRefreshState by viewModel.sourcesRefreshState.collectAsState()
     val updateState by viewModel.updateState.collectAsState()
     val exportImportState by viewModel.exportImportState.collectAsState()
@@ -81,6 +83,7 @@ fun SettingsScreen(
     var showBufferDialog by remember { mutableStateOf(false) }
     var showDuckDialog by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
+    var showPreferredDeviceDialog by remember { mutableStateOf(false) }
     var exportListName by rememberSaveable { mutableStateOf(viewModel.generateExportName()) }
 
     val createDocumentLauncher = rememberLauncherForActivityResult(
@@ -182,6 +185,25 @@ fun SettingsScreen(
                 subtitle = stringResource(R.string.settings_bt_pause_desc),
                 checked = bluetoothAutoPause,
                 onCheckedChange = { viewModel.saveBluetoothAutoPause(it) }
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+            SettingsItem(
+                icon = Icons.Default.Bluetooth,
+                title = stringResource(R.string.settings_preferred_audio_device),
+                subtitle = if (preferredAudioDeviceName.isBlank())
+                    stringResource(R.string.settings_preferred_audio_device_value_default)
+                else
+                    preferredAudioDeviceName,
+                onClick = { showPreferredDeviceDialog = true }
+            )
+            Text(
+                text = stringResource(R.string.settings_preferred_audio_device_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
         }
 
@@ -350,6 +372,18 @@ fun SettingsScreen(
         )
     }
 
+    if (showPreferredDeviceDialog) {
+        PreferredDeviceDialog(
+            currentValue = preferredAudioDeviceName,
+            knownDevices = knownBluetoothDevices,
+            onDismiss = { showPreferredDeviceDialog = false },
+            onSelected = { name ->
+                viewModel.savePreferredAudioDeviceName(name)
+                showPreferredDeviceDialog = false
+            }
+        )
+    }
+
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -382,6 +416,62 @@ private fun buildExportFileName(name: String): String {
         .ifBlank { "wradio-stations" }
         .replace(Regex("[\\\\/:*?\"<>|]"), "_")
     return if (sanitized.lowercase().endsWith(".json")) sanitized else "$sanitized.json"
+}
+
+@Composable
+fun PreferredDeviceDialog(
+    currentValue: String,
+    knownDevices: Set<String>,
+    onDismiss: () -> Unit,
+    onSelected: (String) -> Unit
+) {
+    var selected by remember { mutableStateOf(currentValue) }
+    val options = listOf("") + knownDevices.sorted()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.dialog_preferred_device_title)) },
+        text = {
+            Column {
+                Text(
+                    text = stringResource(R.string.dialog_preferred_device_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                options.forEach { name ->
+                    val label = if (name.isBlank())
+                        stringResource(R.string.settings_preferred_audio_device_value_default)
+                    else name
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = (name == selected),
+                                onClick = { selected = name },
+                                role = Role.RadioButton
+                            )
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = (name == selected), onClick = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = label, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSelected(selected) }) {
+                Text(stringResource(R.string.action_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        }
+    )
 }
 
 @Composable

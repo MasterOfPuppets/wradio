@@ -14,8 +14,8 @@ android {
         applicationId = "pt.pauloliveira.wradio"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.5"
+        versionCode = 6
+        versionName = "1.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -40,6 +40,7 @@ android {
         compose = true
         buildConfig = true
     }
+
 
     applicationVariants.all {
         val variant = this

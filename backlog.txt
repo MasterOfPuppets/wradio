@@ -16,6 +16,10 @@
 - [x] Bluetooth pause via ACTION_AUDIO_BECOMING_NOISY (v1.5)
 - [x] Remove addSampleStations (v1.5)
 - [x] Unit tests for Repository CRUD and ManagementViewModel (v1.5)
+- [x] Preferred audio device setting for Android Auto — force BT_RADIO when Bytelink/AA steals audio (v1.6)
+- [x] Buffering watchdog (30s) — auto-retry stale stream after BT reconnect (v1.6)
+- [x] Stale MediaController detection — reconnect instead of silently dropping commands (v1.6)
+- [x] Playback diagnostics logger — file-based event log for BT/audio routing issues (v1.6)
 
 ## Pending / Ideas
 
