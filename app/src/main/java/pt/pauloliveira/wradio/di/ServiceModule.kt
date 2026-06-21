@@ -2,6 +2,8 @@ package pt.pauloliveira.wradio.di
 
 import android.content.Context
 import androidx.annotation.OptIn
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.util.Util
@@ -62,9 +64,20 @@ object ServiceModule {
         val mediaSourceFactory = DefaultMediaSourceFactory(context)
             .setDataSourceFactory(dataSourceFactory)
 
-        return ExoPlayer.Builder(context)
+        // AudioAttributes USAGE_MEDIA garante que o Android roteia o áudio
+        // para o output de media (bt_radio) e não para outros sinks (ex: ByteLink)
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+            .build()
+
+        val player = ExoPlayer.Builder(context)
             .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
             .build()
+
+        player.setAudioAttributes(audioAttributes, /* handleAudioFocus= */ false)
+
+        return player
     }
 }

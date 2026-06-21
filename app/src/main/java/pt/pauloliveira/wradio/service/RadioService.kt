@@ -69,6 +69,7 @@ class RadioService : MediaLibraryService() {
     private var wasPlayingBeforeFocusLoss = false
     private var lastNoisyEventAt: Long = 0L
     private var audioDeviceCallback: AudioDeviceCallback? = null
+    private var lastAppliedPreferredDevice: AudioDeviceInfo? = null
     private val diagnostics by lazy { PlaybackDiagnosticsLogger(this) }
 
     // Audio becoming noisy receiver (BT disconnected, headphones unplugged)
@@ -160,7 +161,10 @@ class RadioService : MediaLibraryService() {
         if (preferredName.isBlank()) return
         val preferred = btDevices.firstOrNull { it.productName?.toString() == preferredName } ?: return
         (player as? androidx.media3.exoplayer.ExoPlayer)?.setPreferredAudioDevice(preferred)
-        diagnostics.log("service.preferred_device.applied", mapOf("device" to preferredName))
+        diagnostics.log("service.preferred_device.applied", mapOf(
+            "device" to preferredName,
+            "deviceFull" to describeDeviceFull(preferred)
+        ))
     }
 
     private fun isBluetoothOutputDevice(device: AudioDeviceInfo): Boolean {
@@ -186,6 +190,50 @@ class RadioService : MediaLibraryService() {
     private fun describeDevice(device: AudioDeviceInfo): String {
         val name = device.productName?.toString()?.ifBlank { "unknown" } ?: "unknown"
         return "${device.type}:$name"
+    }
+
+    private fun describeDeviceFull(device: AudioDeviceInfo?): String {
+        if (device == null) return "null"
+        val name = device.productName?.toString()?.ifBlank { "unknown" } ?: "unknown"
+        val address = device.address?.ifBlank { "no_addr" } ?: "no_addr"
+        return "id=${device.id},type=${device.type},name=$name,addr=$address"
+    }
+
+    private fun logAudioRoutingSnapshot(trigger: String) {
+        try {
+            // 1. What we last set as preferred device
+            val preferredDesc = describeDeviceFull(lastAppliedPreferredDevice)
+
+            // 2. Check if lastAppliedPreferredDevice is still in the system's device list
+            val preferredStillValid = lastAppliedPreferredDevice?.let { pref ->
+                audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                    .any { it.id == pref.id }
+            } ?: false
+
+            // 3. Settings as read RIGHT NOW from preferences
+            val settingsPreferredName = runBlocking { preferencesRepository.getPreferredAudioDeviceName().first() }
+            val settingsDuckLevel = runBlocking { preferencesRepository.getDuckLevel().first() }
+            val settingsAutoPause = runBlocking { preferencesRepository.getBluetoothAutoPause().first() }
+
+            // 4. Audio focus state (indirectly via volume)
+            val currentVolume = player.volume
+
+            diagnostics.log(
+                event = "service.audio_routing_snapshot",
+                details = mapOf(
+                    "trigger" to trigger,
+                    "preferredDevice" to preferredDesc,
+                    "preferredStillValid" to preferredStillValid,
+                    "settings.preferredName" to settingsPreferredName,
+                    "settings.duckLevel" to settingsDuckLevel,
+                    "settings.autoPause" to settingsAutoPause,
+                    "player.volume" to currentVolume,
+                    "outputs" to describeCurrentOutputs()
+                )
+            )
+        } catch (e: Exception) {
+            diagnostics.log("service.audio_routing_snapshot.error", mapOf("error" to e.message))
+        }
     }
 
     // Audio focus listener
@@ -309,6 +357,13 @@ class RadioService : MediaLibraryService() {
             pageSize: Int,
             params: LibraryParams?
         ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
+            diagnostics.log(
+                event = "service.aa.on_get_children",
+                details = mapOf(
+                    "parentId" to parentId,
+                    "packageName" to browser.packageName
+                )
+            )
             return when (parentId) {
                 MEDIA_ROOT_ID -> {
                     val myRadiosFolder = MediaItem.Builder()
@@ -372,6 +427,15 @@ class RadioService : MediaLibraryService() {
             controller: MediaSession.ControllerInfo,
             mediaItems: MutableList<MediaItem>
         ): ListenableFuture<MutableList<MediaItem>> {
+            diagnostics.log(
+                event = "service.aa.on_add_media_items",
+                details = mapOf(
+                    "packageName" to controller.packageName,
+                    "itemCount" to mediaItems.size,
+                    "firstMediaId" to mediaItems.firstOrNull()?.mediaId,
+                    "hasUri" to (mediaItems.firstOrNull()?.localConfiguration?.uri != null)
+                )
+            )
             // Items com URI passam directamente (vindos da app)
             val needsResolution = mediaItems.any { it.localConfiguration?.uri == null && it.requestMetadata.mediaUri == null }
 
@@ -452,7 +516,14 @@ class RadioService : MediaLibraryService() {
 
     override fun onCreate() {
         super.onCreate()
-        diagnostics.log(event = "service.on_create")
+        diagnostics.log(
+            event = "service.on_create",
+            details = mapOf(
+                "playerHashCode" to System.identityHashCode(player),
+                "playerState" to player.playbackState,
+                "playerHasMedia" to (player.mediaItemCount > 0)
+            )
+        )
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         mediaLibrarySession = MediaLibrarySession.Builder(this, player, librarySessionCallback).build()
         player.addListener(playerListener)
