@@ -76,7 +76,7 @@ object ServiceModule {
             .setLoadControl(loadControl)
             .build()
 
-        player.setAudioAttributes(audioAttributes, /* handleAudioFocus= */ false)
+        player.setAudioAttributes(audioAttributes, /* handleAudioFocus= */ true)
 
         return player
     }
