@@ -81,9 +81,7 @@ fun SettingsScreen(
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showBufferDialog by remember { mutableStateOf(false) }
-    var showDuckDialog by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
-    var showPreferredDeviceDialog by remember { mutableStateOf(false) }
     var exportListName by rememberSaveable { mutableStateOf(viewModel.generateExportName()) }
 
     val createDocumentLauncher = rememberLauncherForActivityResult(
@@ -163,47 +161,12 @@ fun SettingsScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 color = MaterialTheme.colorScheme.outlineVariant
             )
-            SettingsItem(
-                icon = Icons.AutoMirrored.Filled.VolumeDown,
-                title = stringResource(R.string.settings_duck_level),
-                subtitle = stringResource(R.string.settings_duck_level_value, (duckLevel * 100).toInt()),
-                onClick = { showDuckDialog = true }
-            )
-            Text(
-                text = stringResource(R.string.settings_duck_desc),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                color = MaterialTheme.colorScheme.outlineVariant
-            )
             SettingsToggleItem(
                 icon = Icons.Default.Bluetooth,
                 title = stringResource(R.string.settings_bt_pause),
                 subtitle = stringResource(R.string.settings_bt_pause_desc),
                 checked = bluetoothAutoPause,
                 onCheckedChange = { viewModel.saveBluetoothAutoPause(it) }
-            )
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                color = MaterialTheme.colorScheme.outlineVariant
-            )
-            SettingsItem(
-                icon = Icons.Default.Bluetooth,
-                title = stringResource(R.string.settings_preferred_audio_device),
-                subtitle = if (preferredAudioDeviceName.isBlank())
-                    stringResource(R.string.settings_preferred_audio_device_value_default)
-                else
-                    preferredAudioDeviceName,
-                onClick = { showPreferredDeviceDialog = true }
-            )
-            Text(
-                text = stringResource(R.string.settings_preferred_audio_device_desc),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
         }
 
@@ -361,28 +324,6 @@ fun SettingsScreen(
         )
     }
 
-    if (showDuckDialog) {
-        DuckLevelDialog(
-            currentValue = duckLevel,
-            onDismiss = { showDuckDialog = false },
-            onSelected = { level ->
-                viewModel.saveDuckLevel(level)
-                showDuckDialog = false
-            }
-        )
-    }
-
-    if (showPreferredDeviceDialog) {
-        PreferredDeviceDialog(
-            currentValue = preferredAudioDeviceName,
-            knownDevices = knownBluetoothDevices,
-            onDismiss = { showPreferredDeviceDialog = false },
-            onSelected = { name ->
-                viewModel.savePreferredAudioDeviceName(name)
-                showPreferredDeviceDialog = false
-            }
-        )
-    }
 
     if (showDeleteDialog) {
         AlertDialog(
